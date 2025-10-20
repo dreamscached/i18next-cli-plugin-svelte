@@ -30,7 +30,6 @@
     "./dist"
   ],
   "dependencies": {
-    "i18next-cli": "^1.11.9",
     "svelte": "^5.41.0"
   },
   "devDependencies": {
@@ -38,9 +37,13 @@
     "@trivago/prettier-plugin-sort-imports": "^5.2.2",
     "@vitest/coverage-v8": "3.2.4",
     "eslint": "^9.38.0",
+    "i18next-cli": "^1.11.11",
     "prettier": "^3.6.2",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.46.1",
     "vitest": "^3.2.4"
+  },
+  "peerDependencies": {
+    "i18next-cli": "^1.11.11"
   }
 }

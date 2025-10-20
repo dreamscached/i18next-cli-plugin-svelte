@@ -2388,18 +2388,20 @@ __metadata:
     "@trivago/prettier-plugin-sort-imports": "npm:^5.2.2"
     "@vitest/coverage-v8": "npm:3.2.4"
     eslint: "npm:^9.38.0"
-    i18next-cli: "npm:^1.11.9"
+    i18next-cli: "npm:^1.11.11"
     prettier: "npm:^3.6.2"
     svelte: "npm:^5.41.0"
     typescript: "npm:^5.9.3"
     typescript-eslint: "npm:^8.46.1"
     vitest: "npm:^3.2.4"
+  peerDependencies:
+    i18next-cli: ^1.11.11
   languageName: unknown
   linkType: soft
 
-"i18next-cli@npm:^1.11.9":
-  version: 1.11.9
-  resolution: "i18next-cli@npm:1.11.9"
+"i18next-cli@npm:^1.11.11":
+  version: 1.11.11
+  resolution: "i18next-cli@npm:1.11.11"
   dependencies:
     "@swc/core": "npm:1.13.19"
     chalk: "npm:5.6.2"
@@ -2415,7 +2417,7 @@ __metadata:
     swc-walk: "npm:1.0.0"
   bin:
     i18next-cli: dist/esm/cli.js
-  checksum: 10c0/cf7f5fae41e741b3e080608fa5a0650cc073ab232c9ac217788e727bbc33a19efc9f070640710b621457cd792deac58afaa2e2c2260b62f064369afc3b448efb
+  checksum: 10c0/fbcc4cf129cc2e46d4393e04a792e8beb97c86a97ae8e9181aa54682af09ebb0998be06d431f22b8d6257d18269dfde09575e2526484fce20c6d9aec7f7cf87f
   languageName: node
   linkType: hard
 
