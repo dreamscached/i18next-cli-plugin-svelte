@@ -1,0 +1,33 @@
+name: Publish to registries
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  publish_github:
+    name: Publish to Github Packages
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Install Node
+        uses: actions/setup-node@v5
+        with:
+          cache: yarn
+          node-version: "24.x"
+          registry-url: "https://npm.pkg.github.com"
+
+      - name: Install dependencies
+        run: yarn install
+
+      - name: Publish package
+        run: yarn npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
