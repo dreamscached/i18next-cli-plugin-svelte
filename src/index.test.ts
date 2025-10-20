@@ -76,9 +76,19 @@ console.log("World!")`
   [4, 5, 6].forEach(n => console.log(n))
 `
         }
-	])("should extract valid ES code: $name", async ({ source, expected }) => {
+	])("should extract valid ES code: $name", ({ source, expected }) => {
 		const extracted = i18nextSveltePlugin.onLoad(source, "test.svelte");
         expect(() => parse(extracted)).not.toThrow();
+		expect(extracted).toEqual(expected);
+	});
+
+	it.each([
+		{ path: "test.svelte", source: "<script>console.log('test')</script>", expected: "console.log('test')" },
+		{ path: "test.ts", source: "<foobar> invalid svelte/ts code", expected: "<foobar> invalid svelte/ts code" },
+		{ path: "test.svelte.ts", source: "<foobar> invalid svelte/ts code", expected: "<foobar> invalid svelte/ts code" },
+		{ path: "svelte.ts", source: "<foobar> invalid svelte/ts code", expected: "<foobar> invalid svelte/ts code" },
+	])("should skip non-Svelte files: $path", ({path, source, expected}) => {
+		const extracted = i18nextSveltePlugin.onLoad(source, path);
 		expect(extracted).toEqual(expected);
 	});
 });
