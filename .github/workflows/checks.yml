@@ -51,4 +51,3 @@ jobs:
         run: yarn install
       - name: Run vitest
         run: yarn test
-
