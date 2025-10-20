@@ -1,0 +1,37 @@
+name: Run checks on push
+
+on:
+  push:
+
+jobs:
+  build:
+    name: Run tsc
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Install Node
+        uses: actions/setup-node@v5
+        with:
+          cache: yarn
+          node-version: "24.x"
+      - name: Install dependencies
+        run: yarn install
+      - name: Run tsc
+        run: yarn build
+
+  lint:
+    name: Run eslint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Install Node
+        uses: actions/setup-node@v5
+        with:
+          cache: yarn
+          node-version: "24.x"
+      - name: Install dependencies
+        run: yarn install
+      - name: Run tsc
+        run: yarn lint
