@@ -1,12 +1,12 @@
-name: Publish to registries
+name: Publish to npm
 
 on:
   release:
     types: [published]
 
 jobs:
-  publish_github:
-    name: Publish to Github Packages
+  publish_npm:
+    name: Publish to npm
     runs-on: ubuntu-latest
 
     permissions:
@@ -22,7 +22,7 @@ jobs:
         with:
           cache: yarn
           node-version: "24.x"
-          registry-url: "https://npm.pkg.github.com"
+          registry-url: "https://registry.npmjs.org"
 
       - name: Install dependencies
         run: yarn install
