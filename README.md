@@ -5,7 +5,7 @@
 [![GitHub License](https://img.shields.io/github/license/dreamscached/i18next-cli-plugin-svelte)](https://github.com/dreamscached/i18next-cli-plugin-svelte/blob/master/LICENSE)
 
 This plugin is a simple TS/JS code extractor for Svelte component files,
-enabling `i18next-cli extract` to find the translation keys.
+enabling `i18next-cli extract` to find the translation keys in `<script>`
 
 ## Getting started
 
