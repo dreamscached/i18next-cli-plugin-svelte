@@ -1,9 +1,9 @@
 {
   "packageManager": "yarn@4.10.3",
   "name": "i18next-cli-plugin-svelte",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "i18next-cli plugin to extract Javascript/Typescript from Svelte components",
-  "type": "module",
+  "keywords": ["i18next", "i18next-cli", "i18n", "svelte", "extract", "i18next-cli-plugin", "plugin"],
   "author": {
     "name": "dreamscached",
     "email": "dreamscache.d@gmail.com",
@@ -24,6 +24,7 @@
     "build": "tsc -p tsconfig.build.json",
     "prepack": "yarn build"
   },
+  "type": "module",
   "exports": {
     "default": "./dist/index.js"
   },
