@@ -1,7 +1,7 @@
 {
   "packageManager": "yarn@4.10.3",
   "name": "i18next-cli-plugin-svelte",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "i18next-cli plugin to extract Javascript/Typescript from Svelte components",
   "keywords": [
     "i18next",
