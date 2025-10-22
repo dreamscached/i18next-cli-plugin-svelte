@@ -3,7 +3,15 @@
   "name": "i18next-cli-plugin-svelte",
   "version": "1.0.2",
   "description": "i18next-cli plugin to extract Javascript/Typescript from Svelte components",
-  "keywords": ["i18next", "i18next-cli", "i18n", "svelte", "extract", "i18next-cli-plugin", "plugin"],
+  "keywords": [
+    "i18next",
+    "i18next-cli",
+    "i18n",
+    "svelte",
+    "extract",
+    "i18next-cli-plugin",
+    "plugin"
+  ],
   "author": {
     "name": "dreamscached",
     "email": "dreamscache.d@gmail.com",
@@ -31,7 +39,8 @@
   "files": [
     "./dist"
   ],
-  "dependencies": {
+  "peerDependencies": {
+    "i18next-cli": "^1.11.11",
     "svelte": "^5.41.0"
   },
   "devDependencies": {
@@ -41,11 +50,9 @@
     "eslint": "^9.38.0",
     "i18next-cli": "^1.11.11",
     "prettier": "^3.6.2",
+    "svelte": "^5.41.0",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.46.1",
     "vitest": "^3.2.4"
-  },
-  "peerDependencies": {
-    "i18next-cli": "^1.11.11"
   }
 }
