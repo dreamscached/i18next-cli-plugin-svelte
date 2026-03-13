@@ -8,6 +8,7 @@ jobs:
   publish_npm:
     name: Publish to npm
     runs-on: ubuntu-latest
+    environment: npm
 
     permissions:
       contents: read
