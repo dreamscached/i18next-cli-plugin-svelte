@@ -12,7 +12,7 @@ jobs:
 
     permissions:
       contents: read
-      packages: write
+      id-token: read
       attestations: write
 
     steps:
@@ -26,9 +26,9 @@ jobs:
           registry-url: "https://registry.npmjs.org"
 
       - name: Install dependencies
-        run: yarn install
+        run: yarn install --immutable
 
       - name: Publish package
-        run: yarn npm publish
+        run: yarn npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
