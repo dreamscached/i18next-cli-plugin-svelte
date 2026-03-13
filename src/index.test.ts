@@ -77,7 +77,7 @@ console.log("World!")`
 `
 		}
 	])("should extract valid ES code: $name", ({ source, expected }) => {
-		const extracted = i18nextSveltePlugin.onLoad(source, "test.svelte");
+		const extracted = i18nextSveltePlugin.onLoad!(source, "test.svelte") as string;
 		expect(() => parse(extracted)).not.toThrow();
 		expect(extracted).toEqual(expected);
 	});
@@ -91,20 +91,20 @@ console.log("World!")`
 		{
 			path: "test.ts",
 			source: "<foobar> invalid svelte/ts code",
-			expected: "<foobar> invalid svelte/ts code"
+			expected: undefined
 		},
 		{
 			path: "test.svelte.ts",
 			source: "<foobar> invalid svelte/ts code",
-			expected: "<foobar> invalid svelte/ts code"
+			expected: undefined
 		},
 		{
 			path: "svelte.ts",
 			source: "<foobar> invalid svelte/ts code",
-			expected: "<foobar> invalid svelte/ts code"
+			expected: undefined
 		}
 	])("should skip non-Svelte files: $path", ({ path, source, expected }) => {
-		const extracted = i18nextSveltePlugin.onLoad(source, path);
+		const extracted = i18nextSveltePlugin.onLoad!(source, path);
 		expect(extracted).toEqual(expected);
 	});
 });

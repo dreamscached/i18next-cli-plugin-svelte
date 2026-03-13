@@ -2035,6 +2035,7 @@ __metadata:
     "@trivago/prettier-plugin-sort-imports": "npm:^6.0.2"
     "@vitest/coverage-v8": "npm:4.1.0"
     eslint: "npm:^10.0.3"
+    i18next: "npm:^25.8.18"
     i18next-cli: "npm:^1.50.0"
     prettier: "npm:^3.8.1"
     svelte: "npm:^5.53.11"
@@ -2084,6 +2085,20 @@ __metadata:
   bin:
     i18next-resources-for-ts: bin/i18next-resources-for-ts.js
   checksum: 10c0/fccfc6924623bd75a4a468b55942f537e071d7077252933ef9215d62af5a3a8de5cc285d8c3e2ef0171e91b9899c487b898ef1ae5ff77ba301eb50f90bf3e048
+  languageName: node
+  linkType: hard
+
+"i18next@npm:^25.8.18":
+  version: 25.8.18
+  resolution: "i18next@npm:25.8.18"
+  dependencies:
+    "@babel/runtime": "npm:^7.28.6"
+  peerDependencies:
+    typescript: ^5
+  peerDependenciesMeta:
+    typescript:
+      optional: true
+  checksum: 10c0/a5b68b12a8de7db59c6253f6c714616e0a687f1543300cbcfdc847bf6199aef2e3d3645756e3c36a261fdbdde127ad42f4bd1d25571cfe0519849fcbe7665724
   languageName: node
   linkType: hard
 
