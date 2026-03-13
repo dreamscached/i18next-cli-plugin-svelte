@@ -40,19 +40,19 @@
     "./dist"
   ],
   "peerDependencies": {
-    "i18next-cli": "^1.11.11",
-    "svelte": "^5.41.0"
+    "i18next-cli": "^1.50.0",
+    "svelte": "^5.53.11"
   },
   "devDependencies": {
-    "@eslint/js": "^9.38.0",
-    "@trivago/prettier-plugin-sort-imports": "^5.2.2",
-    "@vitest/coverage-v8": "3.2.4",
-    "eslint": "^9.38.0",
-    "i18next-cli": "^1.11.11",
-    "prettier": "^3.6.2",
-    "svelte": "^5.41.0",
+    "@eslint/js": "^10.0.1",
+    "@trivago/prettier-plugin-sort-imports": "^6.0.2",
+    "@vitest/coverage-v8": "4.1.0",
+    "eslint": "^10.0.3",
+    "i18next-cli": "^1.50.0",
+    "prettier": "^3.8.1",
+    "svelte": "^5.53.11",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.46.1",
-    "vitest": "^3.2.4"
+    "typescript-eslint": "^8.57.0",
+    "vitest": "^4.1.0"
   }
 }
