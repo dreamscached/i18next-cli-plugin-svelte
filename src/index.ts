@@ -5,7 +5,7 @@ const i18nextSveltePlugin: Plugin = {
 	name: "i18next-cli-plugin-svelte",
 	onLoad: (code: string, path: string) => {
 		// Passthrough for non-Svelte files
-		if (!path.match(/\.svelte$/)) return code;
+		if (!path.match(/\.svelte$/)) return undefined;
 
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		const fromAst = (node: any) => code.slice(node.content.start, node.content.end);
