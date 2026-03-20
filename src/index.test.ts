@@ -62,7 +62,7 @@ describe("i18nextSveltePlugin", () => {
 console.log("World!")`
 		},
 		{
-			name: "ASI-unsafe component with instance and module <script> tags",
+			name: "asi-unsafe component with instance and module <script> tags",
 			source: `<script>
   const data = [1, 2, 3]
 </script>
@@ -76,10 +76,37 @@ console.log("World!")`
   [4, 5, 6].forEach(n => console.log(n))
 `
 		}
-	])("should extract valid ES code: $name", ({ source, expected }) => {
+	])("should extract valid js code: $name", ({ source, expected }) => {
 		const plugin = new I18nextSveltePlugin();
 		const extracted = plugin.onLoad!(source, "test.svelte") as string;
 		expect(() => parse(extracted)).not.toThrow();
+		expect(extracted).toEqual(expected);
+	});
+
+	it.each([
+		{
+			name: "text tag",
+			source: "<div>{i18next.t('key1')}</div>",
+			expected: "i18next.t('key1')"
+		},
+		{
+			name: "attribute tag",
+			source: "<button title={i18next.t('key2')}></button>",
+			expected: "i18next.t('key2')"
+		},
+		{
+			name: "non-key tag",
+			source: "<div>{variable}</div>",
+			expected: ""
+		},
+		{
+			name: "empty html",
+			source: "<script></script>",
+			expected: ""
+		}
+	])("should extract translation keys from html: $name", ({ source, expected }) => {
+		const plugin = new I18nextSveltePlugin();
+		const extracted = plugin.onLoad!(source, "test.svelte");
 		expect(extracted).toEqual(expected);
 	});
 
@@ -104,7 +131,7 @@ console.log("World!")`
 			source: "<foobar> invalid svelte/ts code",
 			expected: undefined
 		}
-	])("should skip non-Svelte files: $path", ({ path, source, expected }) => {
+	])("should skip non-svelte files: $path", ({ path, source, expected }) => {
 		const plugin = new I18nextSveltePlugin();
 		const extracted = plugin.onLoad!(source, path);
 		expect(extracted).toEqual(expected);
