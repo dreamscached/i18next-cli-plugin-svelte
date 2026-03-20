@@ -1,34 +1,12 @@
 import type { Plugin } from "i18next-cli";
-import { type CompileOptions, compile } from "svelte/compiler";
-
-/** Parameters for {@link I18nextSveltePlugin}. */
-export interface Options {
-	/** Svelte compiler options. */
-	compilerOptions?: CompileOptions | undefined;
-}
+import { parse, type AST } from "svelte/compiler";
 
 /**
- * Provides Svelte component compilation layer for i18next to
- * later parse and extract translation keys from the generated
- * JS source code.
+ * Enables I18next to extract translation keys from .svelte component files.
  */
-export class I18nextSveltePlugin implements Plugin {
+export class I18nextPluginSvelte implements Plugin {
 	/** i18next-cli plugin name. */
 	public readonly name = "i18next-cli-plugin-svelte";
-	/** Svelte compiler options. */
-	private readonly compilerOptions: CompileOptions;
-
-	/**
-	 * Creates a new instance of i18next extractor plugin for
-	 * Svelte with optional parameters.
-	 * @param options optional plugin options
-	 */
-	constructor(options?: Options) {
-		this.compilerOptions = {
-			generate: "client",
-			...(options?.compilerOptions ?? {})
-		};
-	}
 
 	/**
 	 * For every .svelte input file attempts component compilation
@@ -42,8 +20,16 @@ export class I18nextSveltePlugin implements Plugin {
 	onLoad(code: string, path: string): string | undefined {
 		// Passthrough for non-Svelte files
 		if (!path.match(/\.svelte$/)) return undefined;
-		// Compile Svelte to parseable JS code
-		const res = compile(code, this.compilerOptions);
-		return res.js.code;
+
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		const fromAst = (node: any) => code.slice(node.content.start, node.content.end);
+
+		const ast = parse(code, { filename: path }) as AST.Root;
+		const extracted: string[] = [];
+		if (ast.instance) extracted.push(fromAst(ast.instance));
+		if (ast.module) extracted.push(fromAst(ast.module));
+
+		// When contatenating make sure we don't cause issues with ASI
+		return extracted.join("\n;");
 	}
 }
