@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { walk } from "estree-walker";
 import type { Plugin } from "i18next-cli";
 import { parse, type AST } from "svelte/compiler";
@@ -25,10 +26,12 @@ export class I18nextPluginSvelte implements Plugin {
 		const fromAst = (node: any) => code.slice(node.content.start, node.content.end);
 		const fromEstree = (node: any) =>
 			node.type === "MustacheTag"
-				? (code.slice(node.expression.start, node.expression.end).match(/i18next\.t\(.+?\)/g) ?? [])
+				? (code
+						.slice(node.expression.start, node.expression.end)
+						.match(/i18next\.t\(.+?\)/g) ?? [])
 				: [];
 
-		const ast = parse(code, { filename: path }) as AST.Root;
+		const ast = parse(code, { filename: path }) as AST.Root & { html: any };
 		const extracted: string[] = [];
 
 		// extract from the <script> tag
@@ -36,12 +39,13 @@ export class I18nextPluginSvelte implements Plugin {
 		if (ast.module) extracted.push(fromAst(ast.module));
 
 		// extract from HTML
-		if (ast.html)
+		if (ast.html) {
 			walk(ast.html, {
-				enter(node: any) {
-					extracted.push(...fromEstree(node));
+				enter(node) {
+					extracted.push(...fromEstree(node as any));
 				}
 			});
+		}
 
 		// When contatenating make sure we don't cause issues with ASI
 		return extracted.join("\n;");
