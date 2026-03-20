@@ -1,1 +1,1 @@
-export { I18nextSveltePlugin as default, type Options } from "./plugin.js";
+export { I18nextPluginSvelte as default } from "./plugin.js";

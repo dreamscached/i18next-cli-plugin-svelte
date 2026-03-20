@@ -14,7 +14,7 @@ Here's an example `i18next.config.js` file:
 
 ```js
 import { defineConfig } from "i18next-cli";
-import i18nextSveltePlugin from "i18next-cli-plugin-svelte";
+import I18nextSveltePlugin from "i18next-cli-plugin-svelte";
 
 export default defineConfig({
 	locales: ["en", "cs"],
@@ -24,7 +24,7 @@ export default defineConfig({
 		mergeNamespaces: true,
 	},
 	plugins: [
-		i18nextSveltePlugin
+		new I18nextSveltePlugin()
 	]
 });
 ```
