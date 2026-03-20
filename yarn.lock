@@ -2035,6 +2035,7 @@ __metadata:
     "@trivago/prettier-plugin-sort-imports": "npm:^6.0.2"
     "@vitest/coverage-v8": "npm:4.1.0"
     eslint: "npm:^10.0.3"
+    estree-walker: "npm:^3.0.3"
     i18next: "npm:^25.8.18"
     i18next-cli: "npm:^1.50.0"
     prettier: "npm:^3.8.1"
@@ -2043,6 +2044,7 @@ __metadata:
     typescript-eslint: "npm:^8.57.0"
     vitest: "npm:^4.1.0"
   peerDependencies:
+    estree-walker: ^3.0.3
     i18next-cli: ^1.50.0
     svelte: ^5.53.11
   languageName: unknown
