@@ -26,11 +26,9 @@ export class I18nextPluginSvelte implements Plugin {
 		const fromAst = (node: any) => code.slice(node.content.start, node.content.end);
 		const fromEstree = (node: any) =>
 			node.type === "MustacheTag"
-				? (code
-						.slice(node.expression.start, node.expression.end)
-						.match(/i18next\.t\(.+?\)/g) ?? [])
+				? `(${code.slice(node.expression.start, node.expression.end)})`
 				: [];
-
+		
 		const ast = parse(code, { filename: path }) as AST.Root & { html: any };
 		const extracted: string[] = [];
 
