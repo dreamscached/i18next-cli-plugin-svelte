@@ -28,7 +28,7 @@ export class I18nextPluginSvelte implements Plugin {
 			node.type === "MustacheTag"
 				? `(${code.slice(node.expression.start, node.expression.end)})`
 				: undefined;
-
+    
 		const ast = parse(code, { filename: path }) as AST.Root & { html: any };
 		const extracted: string[] = [];
 
