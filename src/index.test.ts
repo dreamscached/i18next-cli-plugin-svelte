@@ -1,7 +1,7 @@
 import { parse } from "svelte/compiler";
 import { describe, expect, it } from "vitest";
 
-import i18nextSveltePlugin from "./index.js";
+import I18nextSveltePlugin from "./index.js";
 
 describe("i18nextSveltePlugin", () => {
 	it.each([
@@ -77,7 +77,8 @@ console.log("World!")`
 `
 		}
 	])("should extract valid ES code: $name", ({ source, expected }) => {
-		const extracted = i18nextSveltePlugin.onLoad!(source, "test.svelte") as string;
+		const plugin = new I18nextSveltePlugin();
+		const extracted = plugin.onLoad!(source, "test.svelte") as string;
 		expect(() => parse(extracted)).not.toThrow();
 		expect(extracted).toEqual(expected);
 	});
@@ -104,7 +105,8 @@ console.log("World!")`
 			expected: undefined
 		}
 	])("should skip non-Svelte files: $path", ({ path, source, expected }) => {
-		const extracted = i18nextSveltePlugin.onLoad!(source, path);
+		const plugin = new I18nextSveltePlugin();
+		const extracted = plugin.onLoad!(source, path);
 		expect(extracted).toEqual(expected);
 	});
 });
