@@ -27,8 +27,8 @@ export class I18nextPluginSvelte implements Plugin {
 		const fromEstree = (node: any) =>
 			node.type === "MustacheTag"
 				? `(${code.slice(node.expression.start, node.expression.end)})`
-				: [];
-		
+				: undefined;
+
 		const ast = parse(code, { filename: path }) as AST.Root & { html: any };
 		const extracted: string[] = [];
 
@@ -40,7 +40,8 @@ export class I18nextPluginSvelte implements Plugin {
 		if (ast.html?.children?.length != 0) {
 			walk(ast.html, {
 				enter(node) {
-					extracted.push(...fromEstree(node as any));
+					const stmt = fromEstree(node);
+					if (stmt) extracted.push(stmt);
 				}
 			});
 		}
