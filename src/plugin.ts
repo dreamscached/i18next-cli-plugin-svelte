@@ -39,7 +39,7 @@ export class I18nextPluginSvelte implements Plugin {
 		if (ast.module) extracted.push(fromAst(ast.module));
 
 		// extract from HTML
-		if (ast.html) {
+		if (ast.html?.children?.length != 0) {
 			walk(ast.html, {
 				enter(node) {
 					extracted.push(...fromEstree(node as any));
