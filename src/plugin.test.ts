@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import I18nextSveltePlugin from "./index.js";
 
-describe("i18nextSveltePlugin", () => {
+describe("I18nextSveltePlugin", () => {
 	it.each([
 		{
 			name: "example Svelte component",
@@ -85,26 +85,36 @@ console.log("World!")`
 
 	it.each([
 		{
-			name: "text tag",
+			name: "text tag (i18next.t)",
 			source: "<div>{i18next.t('key1')}</div>",
-			expected: "i18next.t('key1')"
+			expected: "(i18next.t('key1'))"
 		},
 		{
-			name: "attribute tag",
+			name: "attribute tag (i18next.t)",
 			source: "<button title={i18next.t('key2')}></button>",
-			expected: "i18next.t('key2')"
+			expected: "(i18next.t('key2'))"
+		},
+		{
+			name: "text tag (t)",
+			source: "<div>{t('key1')}</div>",
+			expected: "(t('key1'))"
+		},
+		{
+			name: "attribute tag (t)",
+			source: "<button title={t('key2')}></button>",
+			expected: "(t('key2'))"
 		},
 		{
 			name: "non-key tag",
 			source: "<div>{variable}</div>",
-			expected: ""
+			expected: "(variable)"
 		},
 		{
 			name: "empty html",
 			source: "<script></script>",
 			expected: ""
 		}
-	])("should extract translation keys from html: $name", ({ source, expected }) => {
+	])("should extract statement from mustache tag: $name", ({ source, expected }) => {
 		const plugin = new I18nextSveltePlugin();
 		const extracted = plugin.onLoad!(source, "test.svelte");
 		expect(extracted).toEqual(expected);
