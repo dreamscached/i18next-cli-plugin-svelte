@@ -1,7 +1,5 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { walk } from "estree-walker";
 import type { Plugin } from "i18next-cli";
-import { parse, type AST } from "svelte/compiler";
+import { compile } from "svelte/compiler";
 
 /**
  * Enables I18next to extract translation keys from .svelte component files.
@@ -22,31 +20,7 @@ export class I18nextPluginSvelte implements Plugin {
 	onLoad(code: string, path: string): string | undefined {
 		// Passthrough for non-Svelte files
 		if (!path.match(/\.svelte$/)) return undefined;
-
-		const fromAst = (node: any) => code.slice(node.content.start, node.content.end);
-		const fromEstree = (node: any) =>
-			node.type === "MustacheTag"
-				? `(${code.slice(node.expression.start, node.expression.end)})`
-				: undefined;
-    
-		const ast = parse(code, { filename: path }) as AST.Root & { html: any };
-		const extracted: string[] = [];
-
-		// extract from the <script> tag
-		if (ast.instance) extracted.push(fromAst(ast.instance));
-		if (ast.module) extracted.push(fromAst(ast.module));
-
-		// extract from HTML
-		if (ast.html?.children?.length != 0) {
-			walk(ast.html, {
-				enter(node) {
-					const stmt = fromEstree(node);
-					if (stmt) extracted.push(stmt);
-				}
-			});
-		}
-
-		// When contatenating make sure we don't cause issues with ASI
-		return extracted.join("\n;");
+		const res = compile(code, { generate: "client" });
+		return res.js.code;
 	}
 }

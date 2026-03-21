@@ -1,149 +1,300 @@
-import { parse } from "svelte/compiler";
-import { describe, expect, it } from "vitest";
+import { findKeys, type I18nextToolkitConfig } from "i18next-cli";
+import { mkdir, rm, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
 
 import I18nextSveltePlugin from "./index.js";
 
-describe("I18nextSveltePlugin", () => {
-	it.each([
-		{
-			name: "example Svelte component",
-			source: `
-            <script>
-            import i18n from "i18next-cli";
-            console.log(i18n.t("sample.translation.key"));
-            </script>
+const tempdir = join(__dirname, "..", "test");
+const srcdir = join(tempdir, "src");
+const outdir = join(tempdir, "out");
 
-            <div class="mydiv">Hello world!</div>
+async function writeTestFile(name: string, content: string) {
+	const path = join(srcdir, name);
+	await mkdir(srcdir, { recursive: true });
+	await writeFile(path, content, { encoding: "utf-8" });
+}
 
-            <style>
-                .mydiv {
-                    color: black;
-                }
-            </style>
-            `,
-			expected: `
-            import i18n from "i18next-cli";
-            console.log(i18n.t("sample.translation.key"));
-            `
-		},
-		{
-			name: "one empty <script> tag",
-			source: `<script></script>`,
-			expected: ``
-		},
-		{
-			name: "empty file",
-			source: "",
-			expected: ``
-		},
-		{
-			name: "no <script> tag",
-			source: `<div>foobar</div><style>div{}</style>`,
-			expected: ``
-		},
-		{
-			name: "instance with a module <script> tag",
-			source: `
-            <script module>export const myval = 42;</script>
-            <script>console.log("Hello");</script>
-            `,
-			expected: `console.log("Hello");
-;export const myval = 42;`
-		},
-		{
-			name: "one empty <script module> tag",
-			source: `<script module>export const foobar = "bar";</script>`,
-			expected: `export const foobar = "bar";`
-		},
-		{
-			name: "multiple statements in <script> with no semicolons",
-			source: `<script>console.log("Hello")\nconsole.log("World!")</script>`,
-			expected: `console.log("Hello")
-console.log("World!")`
-		},
-		{
-			name: "asi-unsafe component with instance and module <script> tags",
-			source: `<script>
-  const data = [1, 2, 3]
-</script>
-<script context="module">
-  [4, 5, 6].forEach(n => console.log(n))
-</script>`,
-			expected: `
-  const data = [1, 2, 3]
+async function resetTestDir() {
+	await rm(tempdir, { force: true, recursive: true });
+}
 
-;
-  [4, 5, 6].forEach(n => console.log(n))
-`
-		}
-	])("should extract valid js code: $name", ({ source, expected }) => {
+const configBase: I18nextToolkitConfig = {
+	locales: ["en"],
+	extract: {
+		input: join(srcdir, "*.svelte"),
+		output: join(outdir, "{{language}}/{{namespace}}.json")
+	}
+};
+
+describe("I18nextPluginSvelte", () => {
+	it("should ignore non-svelte files", async () => {
 		const plugin = new I18nextSveltePlugin();
-		const extracted = plugin.onLoad!(source, "test.svelte") as string;
-		expect(() => parse(extracted)).not.toThrow();
-		expect(extracted).toEqual(expected);
+		const res = plugin.onLoad("", "App.js");
+		expect(res).toBeUndefined();
+	});
+});
+
+describe("findKeys", () => {
+	afterEach(async () => {
+		await resetTestDir();
 	});
 
-	it.each([
-		{
-			name: "text tag (i18next.t)",
-			source: "<div>{i18next.t('key1')}</div>",
-			expected: "(i18next.t('key1'))"
-		},
-		{
-			name: "attribute tag (i18next.t)",
-			source: "<button title={i18next.t('key2')}></button>",
-			expected: "(i18next.t('key2'))"
-		},
-		{
-			name: "text tag (t)",
-			source: "<div>{t('key1')}</div>",
-			expected: "(t('key1'))"
-		},
-		{
-			name: "attribute tag (t)",
-			source: "<button title={t('key2')}></button>",
-			expected: "(t('key2'))"
-		},
-		{
-			name: "non-key tag",
-			source: "<div>{variable}</div>",
-			expected: "(variable)"
-		},
-		{
-			name: "empty html",
-			source: "<script></script>",
-			expected: ""
-		}
-	])("should extract statement from mustache tag: $name", ({ source, expected }) => {
-		const plugin = new I18nextSveltePlugin();
-		const extracted = plugin.onLoad!(source, "test.svelte");
-		expect(extracted).toEqual(expected);
+	describe("key extraction from <script> (no t(...) params)", () => {
+		it.each([
+			{
+				description: "from js <script> with default import",
+				content: `
+					<script>
+						import i18n from "i18next";
+						const text1 = i18n.t("hello.script1");
+						const text2 = i18n.t("hello.script2");
+						const text3 = i18n.t("hello.script3");
+					</script>
+				`,
+				keys: [
+					"translation:hello.script1",
+					"translation:hello.script2",
+					"translation:hello.script3"
+				]
+			},
+			{
+				description: "from js <script> with named import",
+				content: `
+					<script>
+						import { t } from "i18next";
+						const text1 = t("hello.script1");
+						const text2 = t("hello.script2");
+						const text3 = t("hello.script3");
+					</script>
+				`,
+				keys: [
+					"translation:hello.script1",
+					"translation:hello.script2",
+					"translation:hello.script3"
+				]
+			},
+			{
+				description: "from ts (with types) <script> with default import",
+				content: `
+					<script lang="ts">
+						import i18n from "i18next";
+						const text1: string = i18n.t("hello.script1");
+						const text2: string = i18n.t("hello.script2");
+						const text3: string = i18n.t("hello.script3");
+					</script>
+				`,
+				keys: [
+					"translation:hello.script1",
+					"translation:hello.script2",
+					"translation:hello.script3"
+				]
+			},
+			{
+				description: "from ts (with types) <script> with named import",
+				content: `
+					<script lang="ts">
+						import { t } from "i18next";
+						const text1: string = t("hello.script1");
+						const text2: string = t("hello.script2");
+						const text3: string = t("hello.script3");
+					</script>
+				`,
+				keys: [
+					"translation:hello.script1",
+					"translation:hello.script2",
+					"translation:hello.script3"
+				]
+			},
+			{
+				description: "from js <script module> with named import",
+				content: `
+					<script lang="ts">
+						import { t } from "i18next";
+						const text1: string = t("hello.script1");
+						const text2: string = t("hello.script2");
+						const text3: string = t("hello.script3");
+					</script>
+				`,
+				keys: [
+					"translation:hello.script1",
+					"translation:hello.script2",
+					"translation:hello.script3"
+				]
+			},
+			{
+				description: "from js <script module> with default import",
+				content: `
+					<script module>
+						import i18n from "i18next";
+						const text1 = i18n.t("hello.script1");
+						const text2 = i18n.t("hello.script2");
+						const text3 = i18n.t("hello.script3");
+					</script>
+				`,
+				keys: [
+					"translation:hello.script1",
+					"translation:hello.script2",
+					"translation:hello.script3"
+				]
+			},
+			{
+				description: "from ts (with types) <script module> with default import",
+				content: `
+					<script lang="ts" module>
+						import i18n from "i18next";
+						const text1: string = i18n.t("hello.script1");
+						const text2: string = i18n.t("hello.script2");
+						const text3: string = i18n.t("hello.script3");
+					</script>
+				`,
+				keys: [
+					"translation:hello.script1",
+					"translation:hello.script2",
+					"translation:hello.script3"
+				]
+			},
+			{
+				description: "from js <script module> with named import",
+				content: `
+					<script module>
+						import { t } from "i18next";
+						const text1 = t("hello.script1");
+						const text2 = t("hello.script2");
+						const text3 = t("hello.script3");
+					</script>
+				`,
+				keys: [
+					"translation:hello.script1",
+					"translation:hello.script2",
+					"translation:hello.script3"
+				]
+			},
+			{
+				description: "from ts (with types) <script module> with named import",
+				content: `
+					<script lang="ts" module>
+						import { t } from "i18next";
+						const text1: string = t("hello.script1");
+						const text2: string = t("hello.script2");
+						const text3: string = t("hello.script3");
+					</script>
+				`,
+				keys: [
+					"translation:hello.script1",
+					"translation:hello.script2",
+					"translation:hello.script3"
+				]
+			},
+			{
+				description: "from js <script> with default import with custom namespace",
+				content: `
+					<script>
+						import i18n from "i18next";
+						const text1 = i18n.t("hello.script1", { ns: "foo" });
+						const text2 = i18n.t("hello.script2", { ns: "bar" });
+						const text3 = i18n.t("hello.script3", { ns: "baz" });
+					</script>
+				`,
+				keys: ["foo:hello.script1", "bar:hello.script2", "baz:hello.script3"]
+			}
+		])("$description", async ({ content, keys }) => {
+			await writeTestFile("App.svelte", content);
+			const res = await findKeys({ ...configBase, plugins: [new I18nextSveltePlugin()] });
+			const extractedKeys = [...res.allKeys.keys()];
+			expect(extractedKeys).toEqual(expect.arrayContaining(keys));
+		});
 	});
 
-	it.each([
-		{
-			path: "test.svelte",
-			source: "<script>console.log('test')</script>",
-			expected: "console.log('test')"
-		},
-		{
-			path: "test.ts",
-			source: "<foobar> invalid svelte/ts code",
-			expected: undefined
-		},
-		{
-			path: "test.svelte.ts",
-			source: "<foobar> invalid svelte/ts code",
-			expected: undefined
-		},
-		{
-			path: "svelte.ts",
-			source: "<foobar> invalid svelte/ts code",
-			expected: undefined
-		}
-	])("should skip non-svelte files: $path", ({ path, source, expected }) => {
-		const plugin = new I18nextSveltePlugin();
-		const extracted = plugin.onLoad!(source, path);
-		expect(extracted).toEqual(expected);
+	describe("key extraction from template tags", () => {
+		it.each([
+			{
+				description: "with default import",
+				content: `
+					<script>
+						import i18n from "i18next";
+					</script>
+					<div>
+						{i18n.t("hello.world1")}
+						{i18n.t("hello.world2")}
+						{i18n.t("hello.world3")}
+					</div>
+				`,
+				keys: [
+					"translation:hello.world1",
+					"translation:hello.world2",
+					"translation:hello.world3"
+				]
+			},
+			{
+				description: "with named import",
+				content: `
+					<script>
+						import { t } from "i18next";
+					</script>
+					<div>
+						{t("hello.world1")}
+						{t("hello.world2")}
+						{t("hello.world3")}
+					</div>
+				`,
+				keys: [
+					"translation:hello.world1",
+					"translation:hello.world2",
+					"translation:hello.world3"
+				]
+			}
+		])("$description", async ({ content, keys }) => {
+			await writeTestFile("App.svelte", content);
+			const res = await findKeys({ ...configBase, plugins: [new I18nextSveltePlugin()] });
+			const extractedKeys = [...res.allKeys.keys()];
+			expect(extractedKeys).toEqual(expect.arrayContaining(keys));
+		});
+	});
+
+	describe("key extraction from attribute tags", () => {
+		it.each([
+			{
+				description: "with default import",
+				content: `
+					<script>
+						import i18n from "i18next";
+					</script>
+					<div>
+						<img alt={i18n.t("hello.world1")}>
+						<img alt={i18n.t("hello.world2")}>
+						<img alt={i18n.t("hello.world3")}>
+					</div>
+				`,
+				keys: [
+					"translation:hello.world1",
+					"translation:hello.world2",
+					"translation:hello.world3"
+				]
+			},
+			{
+				description: "with named import",
+				content: `
+					<script>
+						import { t } from "i18next";
+					</script>
+					<div>
+						<img alt={t("hello.world1")}>
+						<img alt={t("hello.world2")}>
+						<img alt={t("hello.world3")}>
+					</div>
+				`,
+				keys: [
+					"translation:hello.world1",
+					"translation:hello.world2",
+					"translation:hello.world3"
+				]
+			}
+		])("$description", async ({ content, keys }) => {
+			await writeTestFile("App.svelte", content);
+			const res = await findKeys({ ...configBase, plugins: [new I18nextSveltePlugin()] });
+			const extractedKeys = [...res.allKeys.keys()];
+			expect(extractedKeys).toEqual(expect.arrayContaining(keys));
+		});
 	});
 });
