@@ -1,6 +1,7 @@
-import { findKeys, type I18nextToolkitConfig } from "i18next-cli";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+
+import { findKeys, type I18nextToolkitConfig } from "i18next-cli";
 import { afterEach, describe, expect, it } from "vitest";
 
 import I18nextSveltePlugin from "./index.js";
