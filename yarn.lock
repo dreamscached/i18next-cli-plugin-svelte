@@ -2055,7 +2055,6 @@ __metadata:
     typescript-eslint: "npm:^8.57.0"
     vitest: "npm:^4.1.0"
   peerDependencies:
-    glob: "*"
     i18next-cli: ^1.50.0
     svelte: ^5.53.11
   languageName: unknown
