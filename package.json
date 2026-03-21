@@ -8,7 +8,6 @@
     "i18next-cli",
     "i18n",
     "svelte",
-    "estree-walker",
     "extract",
     "i18next-cli-plugin",
     "plugin"
@@ -50,7 +49,6 @@
     "@types/node": "^25.5.0",
     "@vitest/coverage-v8": "4.1.0",
     "eslint": "^10.0.3",
-    "estree-walker": "^3.0.3",
     "glob": "^13.0.6",
     "i18next": "^25.8.18",
     "i18next-cli": "^1.50.0",
