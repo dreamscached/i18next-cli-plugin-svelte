@@ -42,17 +42,18 @@
   ],
   "peerDependencies": {
     "estree-walker": "^3.0.3",
-    "i18next-cli": "^1.50.0",
+    "i18next-cli": "^1.51.6",
     "svelte": "^5.53.11"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@trivago/prettier-plugin-sort-imports": "^6.0.2",
+    "@types/node": "^25.5.2",
     "@vitest/coverage-v8": "4.1.0",
     "eslint": "^10.0.3",
     "estree-walker": "^3.0.3",
     "i18next": "^25.8.18",
-    "i18next-cli": "^1.50.0",
+    "i18next-cli": "^1.51.6",
     "prettier": "^3.8.1",
     "svelte": "^5.53.11",
     "typescript": "^5.9.3",
