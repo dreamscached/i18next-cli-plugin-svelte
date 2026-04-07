@@ -2216,7 +2216,7 @@ __metadata:
     vitest: "npm:^4.1.0"
   peerDependencies:
     estree-walker: ^3.0.3
-    i18next-cli: ^1.50.0
+    i18next-cli: ^1.51.6
     svelte: ^5.53.11
   languageName: unknown
   linkType: soft
