@@ -28,7 +28,7 @@ export class I18nextPluginSvelte implements Plugin {
 			node.type === "MustacheTag"
 				? `(${code.slice(node.expression.start, node.expression.end)})`
 				: undefined;
-    
+
 		const ast = parse(code, { filename: path }) as AST.Root & { html: any };
 		const extracted: string[] = [];
 
@@ -85,8 +85,9 @@ export class I18nextPluginSvelte implements Plugin {
 		const hookName: string = innerCall.callee.value;
 
 		// Check if the inner call matches a registered useTranslationNames entry
-		const useTranslationNames =
-			context.config.extract.useTranslationNames ?? ["useTranslation"];
+		const useTranslationNames = context.config.extract.useTranslationNames ?? [
+			"useTranslation"
+		];
 		let nsArgIndex = 0;
 		let kpArgIndex = 1;
 		let matched = false;
@@ -108,13 +109,9 @@ export class I18nextPluginSvelte implements Plugin {
 
 		// Extract namespace and keyPrefix from the inner call's arguments
 		const nsNode =
-			nsArgIndex !== -1
-				? innerCall.arguments?.[nsArgIndex]?.expression
-				: undefined;
+			nsArgIndex !== -1 ? innerCall.arguments?.[nsArgIndex]?.expression : undefined;
 		const kpNode =
-			kpArgIndex !== -1
-				? innerCall.arguments?.[kpArgIndex]?.expression
-				: undefined;
+			kpArgIndex !== -1 ? innerCall.arguments?.[kpArgIndex]?.expression : undefined;
 
 		const defaultNs: string | undefined =
 			nsNode?.type === "StringLiteral" ? nsNode.value : undefined;
@@ -127,22 +124,16 @@ export class I18nextPluginSvelte implements Plugin {
 		// (required by exactOptionalPropertyTypes)
 		const scopeInfo = {
 			...(defaultNs ? { defaultNs } : {}),
-			...(keyPrefix ? { keyPrefix } : {}),
+			...(keyPrefix ? { keyPrefix } : {})
 		};
 
 		// Register destructured variables in scope
 		if (node.id.type === "ObjectPattern") {
 			for (const prop of node.id.properties) {
-				if (
-					prop.type === "AssignmentPatternProperty" &&
-					prop.key.type === "Identifier"
-				) {
+				if (prop.type === "AssignmentPatternProperty" && prop.key.type === "Identifier") {
 					context.setVarInScope(prop.key.value, scopeInfo);
 				}
-				if (
-					prop.type === "KeyValuePatternProperty" &&
-					prop.value.type === "Identifier"
-				) {
+				if (prop.type === "KeyValuePatternProperty" && prop.value.type === "Identifier") {
 					context.setVarInScope(prop.value.value, scopeInfo);
 				}
 			}

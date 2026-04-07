@@ -1,9 +1,10 @@
 import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
-import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { join } from "node:path";
+
 import { extract } from "i18next-cli";
 import type { I18nextToolkitConfig } from "i18next-cli";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 
 import I18nextSveltePlugin from "./index.js";
 
@@ -25,7 +26,7 @@ describe("$derived.by / $derived rune unwrapping", () => {
 	});
 
 	function makeConfig(
-		overrides?: Partial<I18nextToolkitConfig["extract"]>,
+		overrides?: Partial<I18nextToolkitConfig["extract"]>
 	): I18nextToolkitConfig {
 		return {
 			locales: ["en"],
@@ -35,13 +36,10 @@ describe("$derived.by / $derived rune unwrapping", () => {
 				functions: ["t"],
 				transComponents: ["Trans"],
 				defaultNS: "translation",
-				useTranslationNames: [
-					"useTranslation",
-					"getTranslationContext",
-				],
-				...overrides,
+				useTranslationNames: ["useTranslation", "getTranslationContext"],
+				...overrides
 			},
-			plugins: [new I18nextSveltePlugin()],
+			plugins: [new I18nextSveltePlugin()]
 		};
 	}
 
@@ -52,17 +50,15 @@ describe("$derived.by / $derived rune unwrapping", () => {
   const { t } = $derived.by(getTranslationContext('my-namespace'));
 </script>
 
-<div>{t('hello-world', 'Hello World')}</div>`,
+<div>{t('hello-world', 'Hello World')}</div>`
 		);
 
 		const results = await extract(makeConfig());
-		const nsFile = results.find((r) =>
-			pathEndsWith(r.path, "/en/my-namespace.json"),
-		);
+		const nsFile = results.find((r) => pathEndsWith(r.path, "/en/my-namespace.json"));
 
 		expect(nsFile).toBeDefined();
 		expect(nsFile!.newTranslations).toEqual({
-			"hello-world": "Hello World",
+			"hello-world": "Hello World"
 		});
 	});
 
@@ -73,17 +69,15 @@ describe("$derived.by / $derived rune unwrapping", () => {
   const { t } = $derived(getTranslationContext('my-namespace'));
 </script>
 
-<div>{t('hello-world', 'Hello World')}</div>`,
+<div>{t('hello-world', 'Hello World')}</div>`
 		);
 
 		const results = await extract(makeConfig());
-		const nsFile = results.find((r) =>
-			pathEndsWith(r.path, "/en/my-namespace.json"),
-		);
+		const nsFile = results.find((r) => pathEndsWith(r.path, "/en/my-namespace.json"));
 
 		expect(nsFile).toBeDefined();
 		expect(nsFile!.newTranslations).toEqual({
-			"hello-world": "Hello World",
+			"hello-world": "Hello World"
 		});
 	});
 
@@ -97,18 +91,16 @@ describe("$derived.by / $derived rune unwrapping", () => {
 <div>
   <h1>{t('title', 'Title')}</h1>
   <p>{t('description', 'Description')}</p>
-</div>`,
+</div>`
 		);
 
 		const results = await extract(makeConfig());
-		const nsFile = results.find((r) =>
-			pathEndsWith(r.path, "/en/my-namespace.json"),
-		);
+		const nsFile = results.find((r) => pathEndsWith(r.path, "/en/my-namespace.json"));
 
 		expect(nsFile).toBeDefined();
 		expect(nsFile!.newTranslations).toEqual({
 			title: "Title",
-			description: "Description",
+			description: "Description"
 		});
 	});
 
@@ -119,17 +111,15 @@ describe("$derived.by / $derived rune unwrapping", () => {
   const { t: translate } = $derived.by(getTranslationContext('my-namespace'));
 </script>
 
-<div>{translate('hello-world', 'Hello World')}</div>`,
+<div>{translate('hello-world', 'Hello World')}</div>`
 		);
 
 		const results = await extract(makeConfig());
-		const nsFile = results.find((r) =>
-			pathEndsWith(r.path, "/en/my-namespace.json"),
-		);
+		const nsFile = results.find((r) => pathEndsWith(r.path, "/en/my-namespace.json"));
 
 		expect(nsFile).toBeDefined();
 		expect(nsFile!.newTranslations).toEqual({
-			"hello-world": "Hello World",
+			"hello-world": "Hello World"
 		});
 	});
 
@@ -140,24 +130,22 @@ describe("$derived.by / $derived rune unwrapping", () => {
   const { t } = $derived.by(useCustomHook('myPrefix'));
 </script>
 
-<div>{t('title', 'Title')}</div>`,
+<div>{t('title', 'Title')}</div>`
 		);
 
 		const config = makeConfig({
 			useTranslationNames: [
 				"useTranslation",
-				{ name: "useCustomHook", nsArg: -1, keyPrefixArg: 0 },
-			],
+				{ name: "useCustomHook", nsArg: -1, keyPrefixArg: 0 }
+			]
 		});
 
 		const results = await extract(config);
-		const file = results.find((r) =>
-			pathEndsWith(r.path, "/en/translation.json"),
-		);
+		const file = results.find((r) => pathEndsWith(r.path, "/en/translation.json"));
 
 		expect(file).toBeDefined();
 		expect(file!.newTranslations).toEqual({
-			myPrefix: { title: "Title" },
+			myPrefix: { title: "Title" }
 		});
 	});
 
@@ -168,17 +156,15 @@ describe("$derived.by / $derived rune unwrapping", () => {
   const { t } = getTranslationContext('my-namespace');
 </script>
 
-<div>{t('hello-world', 'Hello World')}</div>`,
+<div>{t('hello-world', 'Hello World')}</div>`
 		);
 
 		const results = await extract(makeConfig());
-		const nsFile = results.find((r) =>
-			pathEndsWith(r.path, "/en/my-namespace.json"),
-		);
+		const nsFile = results.find((r) => pathEndsWith(r.path, "/en/my-namespace.json"));
 
 		expect(nsFile).toBeDefined();
 		expect(nsFile!.newTranslations).toEqual({
-			"hello-world": "Hello World",
+			"hello-world": "Hello World"
 		});
 	});
 
@@ -189,13 +175,11 @@ describe("$derived.by / $derived rune unwrapping", () => {
   const { t } = $derived.by(someUnrelatedFunction('arg'));
 </script>
 
-<div>{t('hello-world', 'Hello World')}</div>`,
+<div>{t('hello-world', 'Hello World')}</div>`
 		);
 
 		const results = await extract(makeConfig());
-		const file = results.find((r) =>
-			pathEndsWith(r.path, "/en/translation.json"),
-		);
+		const file = results.find((r) => pathEndsWith(r.path, "/en/translation.json"));
 
 		expect(file).toBeDefined();
 		expect(file!.newTranslations).toHaveProperty("hello-world");
