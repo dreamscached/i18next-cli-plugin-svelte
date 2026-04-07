@@ -55,6 +55,7 @@ export class I18nextPluginSvelte implements Plugin {
 	 * useTranslation-style hooks so the extractor can resolve the
 	 * namespace and keyPrefix that would otherwise be lost.
 	 *
+	 * @see https://github.com/dreamscached/i18next-cli-plugin-svelte/issues/5
 	 * @see https://github.com/i18next/i18next-cli/issues/231
 	 */
 	onVisitNode(node: any, context: PluginContext): void {
