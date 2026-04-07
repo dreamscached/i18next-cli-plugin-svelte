@@ -148,6 +148,7 @@ export class I18nextPluginSvelte implements Plugin {
 				}
 			}
 		} else if (node.id.type === "Identifier") {
+			// FIXME: this never fires?
 			context.setVarInScope(node.id.value, scopeInfo);
 		}
 	}

@@ -190,7 +190,7 @@ console.log("World!");
 				extract: {
 					input: [join(tempDir, "src/**/*.{svelte,svelte.ts}")],
 					output: join(tempDir, "locales/{{language}}/{{namespace}}.json"),
-					functions: ["t"],
+					functions: ["t", "i18n.t"],
 					transComponents: ["Trans"],
 					defaultNS: "translation",
 					useTranslationNames: ["useTranslation", "getTranslationContext"],
@@ -323,6 +323,21 @@ console.log("World!");
 					"hello-world": "Hello World"
 				}
 			}
+			// FIXME: this should work, but it doesn't; this is bad!
+			// {
+			// 	name: "handles non-destructured assignment: const i18n = ...",
+			// 	filename: "src/App.svelte",
+			// 	source: `
+			// 		<script>
+			// 			const i18n = $derived.by(getTranslationContext('my-namespace'));
+			// 		</script>
+			// 		<div>{i18n.t('hello-world', 'Hello World')}</div>
+			// 	`,
+			// 	expectedNamespace: "/en/my-namespace.json",
+			// 	expectedTranslations: {
+			// 		"hello-world": "Hello World"
+			// 	}
+			// }
 		])(
 			"$name",
 			async ({
@@ -343,5 +358,72 @@ console.log("World!");
 				}
 			}
 		);
+	});
+
+	describe("should extract translation keys from svelte components", () => {
+		let tempDir: string;
+
+		function pathEndsWith(p: string | undefined, suffix: string): boolean {
+			if (!p) return false;
+			return p.replace(/\\/g, "/").endsWith(suffix);
+		}
+
+		beforeEach(async () => {
+			tempDir = await mkdtemp(join(tmpdir(), "i18next-svelte-key-extract-"));
+			await mkdir(join(tempDir, "src"), { recursive: true });
+		});
+
+		afterEach(async () => {
+			await rm(tempDir, { recursive: true, force: true });
+		});
+
+		function makeConfig(): I18nextToolkitConfig {
+			return {
+				locales: ["en"],
+				extract: {
+					input: [join(tempDir, "src/**/*.svelte")],
+					output: join(tempDir, "locales/{{language}}/{{namespace}}.json"),
+					functions: ["t", "i18next.t"],
+					defaultNS: "translation"
+				},
+				plugins: [new I18nextSveltePlugin()]
+			};
+		}
+
+		it.each([
+			{
+				name: "extracts simple keys from script and html",
+				source: `
+                    <script>
+						import { t } from "i18next";
+                        const val = t('key_script', 'Default Script');
+                    </script>
+                    <div>{t('key_html', 'Default HTML')}</div>
+                `,
+				expected: {
+					key_script: "Default Script",
+					key_html: "Default HTML"
+				}
+			},
+			{
+				name: "extracts keys from attributes",
+				source: `
+                    <script>
+						import { t } from "i18next";
+                    </script>
+					<button title={t('key_attr', 'Default Attr')}>
+					</button>
+				`,
+				expected: {
+					key_attr: "Default Attr"
+				}
+			}
+		])("$name", async ({ source, expected }) => {
+			await writeFile(join(tempDir, "src/App.svelte"), source);
+			const results = await extract(makeConfig());
+			const defaultFile = results.find((r) => pathEndsWith(r.path, "/en/translation.json"));
+			expect(defaultFile).toBeDefined();
+			expect(defaultFile!.newTranslations).toEqual(expected);
+		});
 	});
 });
