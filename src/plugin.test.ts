@@ -200,55 +200,36 @@ console.log("World!");
 			};
 		}
 
-		it("resolves namespace from $derived.by(getTranslationContext(...))", async () => {
-			await writeFile(
-				join(tempDir, "src/App.svelte"),
-				`
+		it.each([
+			{
+				name: "resolves namespace from $derived.by(getTranslationContext(...))",
+				source: `
 					<script>
 						const { t } = $derived.by(getTranslationContext('my-namespace'));
 					</script>
-
-					<div>
-						{t('hello-world', 'Hello World')}
-					</div>
-				`
-			);
-
-			const results = await extract(makeConfig());
-			const nsFile = results.find((r) => pathEndsWith(r.path, "/en/my-namespace.json"));
-
-			expect(nsFile).toBeDefined();
-			expect(nsFile!.newTranslations).toEqual({
-				"hello-world": "Hello World"
-			});
-		});
-
-		it("resolves namespace from $derived(getTranslationContext(...))", async () => {
-			await writeFile(
-				join(tempDir, "src/App.svelte"),
-				`
+					<div>{t('hello-world', 'Hello World')}</div>
+				`,
+				expectedNamespace: "/en/my-namespace.json",
+				expectedTranslations: {
+					"hello-world": "Hello World"
+				}
+			},
+			{
+				name: "resolves namespace from $derived(getTranslationContext(...))",
+				source: `
 					<script>
 						const { t } = $derived(getTranslationContext('my-namespace'));
 					</script>
-					<div>
-						{t('hello-world', 'Hello World')}
-					</div>
-				`
-			);
-
-			const results = await extract(makeConfig());
-			const nsFile = results.find((r) => pathEndsWith(r.path, "/en/my-namespace.json"));
-
-			expect(nsFile).toBeDefined();
-			expect(nsFile!.newTranslations).toEqual({
-				"hello-world": "Hello World"
-			});
-		});
-
-		it("extracts multiple keys into the correct namespace", async () => {
-			await writeFile(
-				join(tempDir, "src/App.svelte"),
-				`
+					<div>{t('hello-world', 'Hello World')}</div>
+				`,
+				expectedNamespace: "/en/my-namespace.json",
+				expectedTranslations: {
+					"hello-world": "Hello World"
+				}
+			},
+			{
+				name: "extracts multiple keys into the correct namespace",
+				source: `
 					<script>
 						const { t } = $derived.by(getTranslationContext('my-namespace'));
 					</script>
@@ -256,110 +237,86 @@ console.log("World!");
 						<h1>{t('title', 'Title')}</h1>
 						<p>{t('description', 'Description')}</p>
 					</div>
-				`
-			);
-
-			const results = await extract(makeConfig());
-			const nsFile = results.find((r) => pathEndsWith(r.path, "/en/my-namespace.json"));
-
-			expect(nsFile).toBeDefined();
-			expect(nsFile!.newTranslations).toEqual({
-				title: "Title",
-				description: "Description"
-			});
-		});
-
-		it("handles destructured alias: const { t: translate } = ...", async () => {
-			await writeFile(
-				join(tempDir, "src/App.svelte"),
-				`
+				`,
+				expectedNamespace: "/en/my-namespace.json",
+				expectedTranslations: {
+					title: "Title",
+					description: "Description"
+				}
+			},
+			{
+				name: "handles destructured alias: const { t: translate } = ...",
+				source: `
 					<script>
 						const { t: translate } = $derived.by(getTranslationContext('my-namespace'));
 					</script>
-					<div>
-						{translate('hello-world', 'Hello World')}
-					</div>
-				`
-			);
-
-			const results = await extract(makeConfig());
-			const nsFile = results.find((r) => pathEndsWith(r.path, "/en/my-namespace.json"));
-
-			expect(nsFile).toBeDefined();
-			expect(nsFile!.newTranslations).toEqual({
-				"hello-world": "Hello World"
-			});
-		});
-
-		it("resolves keyPrefix from custom hook config", async () => {
-			await writeFile(
-				join(tempDir, "src/App.svelte"),
-				`
+					<div>{translate('hello-world', 'Hello World')}</div>
+				`,
+				expectedNamespace: "/en/my-namespace.json",
+				expectedTranslations: {
+					"hello-world": "Hello World"
+				}
+			},
+			{
+				name: "resolves keyPrefix from custom hook config",
+				source: `
 					<script>
 						const { t } = $derived.by(useCustomHook('myPrefix'));
 					</script>
-					<div>
-						{t('title', 'Title')}
-					</div>
-				`
-			);
-
-			const config = makeConfig({
-				useTranslationNames: [
-					"useTranslation",
-					{ name: "useCustomHook", nsArg: -1, keyPrefixArg: 0 }
-				]
-			});
-
-			const results = await extract(config);
-			const file = results.find((r) => pathEndsWith(r.path, "/en/translation.json"));
-
-			expect(file).toBeDefined();
-			expect(file!.newTranslations).toEqual({
-				myPrefix: { title: "Title" }
-			});
-		});
-
-		it("does not interfere with non-$derived useTranslation calls", async () => {
-			await writeFile(
-				join(tempDir, "src/App.svelte"),
-				`
+					<div>{t('title', 'Title')}</div>
+				`,
+				configOverrides: {
+					useTranslationNames: [
+						"useTranslation",
+						{ name: "useCustomHook", nsArg: -1, keyPrefixArg: 0 }
+					]
+				},
+				expectedNamespace: "/en/translation.json",
+				expectedTranslations: {
+					myPrefix: {
+						title: "Title"
+					}
+				}
+			},
+			{
+				name: "does not interfere with non-$derived useTranslation calls",
+				source: `
 					<script>
 						const { t } = getTranslationContext('my-namespace');
 					</script>
-					<div>
-						{t('hello-world', 'Hello World')}
-					</div>
-				`
-			);
-
-			const results = await extract(makeConfig());
-			const nsFile = results.find((r) => pathEndsWith(r.path, "/en/my-namespace.json"));
-
-			expect(nsFile).toBeDefined();
-			expect(nsFile!.newTranslations).toEqual({
-				"hello-world": "Hello World"
-			});
-		});
-
-		it("ignores $derived.by wrapping unknown functions", async () => {
-			await writeFile(
-				join(tempDir, "src/App.svelte"),
-				`
+					<div>{t('hello-world', 'Hello World')}</div>
+				`,
+				expectedNamespace: "/en/my-namespace.json",
+				expectedTranslations: {
+					"hello-world": "Hello World"
+				}
+			},
+			{
+				name: "ignores $derived.by wrapping unknown functions",
+				source: `
 					<script>
 						const { t } = $derived.by(someUnrelatedFunction('arg'));
 					</script>
-					<div>
-						{t('hello-world', 'Hello World')}
-					</div>
-				`
-			);
+					<div>{t('hello-world', 'Hello World')}</div>
+				`,
+				expectedNamespace: "/en/translation.json",
+				expectedTranslations: {
+					"hello-world": "Hello World"
+				}
+			}
+		])(
+			"$name",
+			async ({ source, expectedNamespace, expectedTranslations, configOverrides }) => {
+				await writeFile(join(tempDir, "src/App.svelte"), source);
 
-			const results = await extract(makeConfig());
-			const file = results.find((r) => pathEndsWith(r.path, "/en/translation.json"));
+				const results = await extract(makeConfig(configOverrides));
+				const nsFile = results.find((r) => pathEndsWith(r.path, expectedNamespace));
 
-			expect(file).toBeDefined();
-			expect(file!.newTranslations).toHaveProperty("hello-world");
-		});
+				expect(nsFile).toBeDefined();
+				if (expectedTranslations) {
+					expect(nsFile!.newTranslations).toEqual(expectedTranslations);
+				}
+			}
+		);
 	});
 });
