@@ -12,13 +12,13 @@ export class I18nextPluginSvelte implements Plugin {
 	public readonly name = "i18next-cli-plugin-svelte";
 
 	/**
-	 * For every .svelte input file attempts component compilation
-	 * to i18next-parseable JS source code file for further key
-	 * extraction.
+	 * Extracts JS code from Svelte component `<script>` or `<script module>`,
+	 * Svelte templates and attribute value expressions.
+	 *
 	 * @param code raw source code to process
 	 * @param path path to the source file
-	 * @returns generated JS code from .svelte component or
-	 * undefined for non-Svelte files
+	 * @returns extracted JS code from .svelte component or
+	 *   `undefined` for non-Svelte files
 	 */
 	onLoad(code: string, path: string): string | undefined {
 		// Passthrough for non-Svelte files
@@ -60,9 +60,9 @@ export class I18nextPluginSvelte implements Plugin {
 	}
 
 	/**
-	 * Unwraps Svelte 5 rune wrappers ($derived.by / $derived) around
-	 * useTranslation-style hooks so the extractor can resolve the
-	 * namespace and keyPrefix that would otherwise be lost.
+	 * Unwraps Svelte 5 rune wrappers (`$derived.by` and `$derived`) around
+	 * `useTranslation`-style hooks so the extractor can resolve the
+	 * `namespace` and `keyPrefix` that would otherwise be lost.
 	 *
 	 * @see https://github.com/dreamscached/i18next-cli-plugin-svelte/issues/5
 	 * @see https://github.com/i18next/i18next-cli/issues/231
@@ -95,9 +95,9 @@ export class I18nextPluginSvelte implements Plugin {
 		const hookName: string = innerCall.callee.value;
 
 		// Check if the inner call matches a registered useTranslationNames entry
-		const useTranslationNames = context.config.extract.useTranslationNames ?? [
-			"useTranslation"
-		];
+		// prettier-ignore
+		const useTranslationNames = context.config.extract.useTranslationNames ?? ["useTranslation"];
+
 		let nsArgIndex = 0;
 		let kpArgIndex = 1;
 		let matched = false;
