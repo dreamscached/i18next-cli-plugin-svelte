@@ -6,6 +6,7 @@
 
 This plugin is a simple TS/JS code extractor for Svelte component files,
 enabling `i18next-cli extract` to find the translation keys in `<script>`
+and in 'mustache' tags (Svelte templates.)
 
 ## Getting started
 
@@ -17,14 +18,7 @@ import { defineConfig } from "i18next-cli";
 import I18nextSveltePlugin from "i18next-cli-plugin-svelte";
 
 export default defineConfig({
-	locales: ["en", "cs"],
-	extract: {
-		input: "src/**/*.{ts,svelte}",
-		output: "src/assets/i18n/{{language}}.json",
-		mergeNamespaces: true,
-	},
-	plugins: [
-		new I18nextSveltePlugin()
-	]
+	// ...
+	plugins: [new I18nextSveltePlugin()]
 });
 ```
