@@ -188,7 +188,7 @@ console.log("World!");
 			return {
 				locales: ["en"],
 				extract: {
-					input: [join(tempDir, "src/**/*.svelte")],
+					input: [join(tempDir, "src/**/*.{svelte,svelte.ts}")],
 					output: join(tempDir, "locales/{{language}}/{{namespace}}.json"),
 					functions: ["t"],
 					transComponents: ["Trans"],
@@ -203,6 +203,7 @@ console.log("World!");
 		it.each([
 			{
 				name: "resolves namespace from $derived.by(getTranslationContext(...))",
+				filename: "src/App.svelte",
 				source: `
 					<script>
 						const { t } = $derived.by(getTranslationContext('my-namespace'));
@@ -216,6 +217,7 @@ console.log("World!");
 			},
 			{
 				name: "resolves namespace from $derived(getTranslationContext(...))",
+				filename: "src/App.svelte",
 				source: `
 					<script>
 						const { t } = $derived(getTranslationContext('my-namespace'));
@@ -229,6 +231,7 @@ console.log("World!");
 			},
 			{
 				name: "extracts multiple keys into the correct namespace",
+				filename: "src/App.svelte",
 				source: `
 					<script>
 						const { t } = $derived.by(getTranslationContext('my-namespace'));
@@ -246,6 +249,7 @@ console.log("World!");
 			},
 			{
 				name: "handles destructured alias: const { t: translate } = ...",
+				filename: "src/App.svelte",
 				source: `
 					<script>
 						const { t: translate } = $derived.by(getTranslationContext('my-namespace'));
@@ -259,6 +263,7 @@ console.log("World!");
 			},
 			{
 				name: "resolves keyPrefix from custom hook config",
+				filename: "src/App.svelte",
 				source: `
 					<script>
 						const { t } = $derived.by(useCustomHook('myPrefix'));
@@ -280,6 +285,7 @@ console.log("World!");
 			},
 			{
 				name: "does not interfere with non-$derived useTranslation calls",
+				filename: "src/App.svelte",
 				source: `
 					<script>
 						const { t } = getTranslationContext('my-namespace');
@@ -293,6 +299,7 @@ console.log("World!");
 			},
 			{
 				name: "ignores $derived.by wrapping unknown functions",
+				filename: "src/App.svelte",
 				source: `
 					<script>
 						const { t } = $derived.by(someUnrelatedFunction('arg'));
@@ -303,11 +310,29 @@ console.log("World!");
 				expectedTranslations: {
 					"hello-world": "Hello World"
 				}
+			},
+			{
+				name: "handles $derived.by in .svelte.ts files",
+				filename: "src/app.svelte.ts",
+				source: `
+					const { t } = $derived.by(getTranslationContext('my-namespace'));
+					console.log(t('hello-world', 'Hello World'));
+				`,
+				expectedNamespace: "/en/my-namespace.json",
+				expectedTranslations: {
+					"hello-world": "Hello World"
+				}
 			}
 		])(
 			"$name",
-			async ({ source, expectedNamespace, expectedTranslations, configOverrides }) => {
-				await writeFile(join(tempDir, "src/App.svelte"), source);
+			async ({
+				source,
+				filename,
+				expectedNamespace,
+				expectedTranslations,
+				configOverrides
+			}) => {
+				await writeFile(join(tempDir, filename), source);
 
 				const results = await extract(makeConfig(configOverrides));
 				const nsFile = results.find((r) => pathEndsWith(r.path, expectedNamespace));
