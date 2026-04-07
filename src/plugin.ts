@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { generate } from "astring";
 import { walk } from "estree-walker";
 import type { Plugin, PluginContext } from "i18next-cli";
 import { parse, type AST } from "svelte/compiler";
@@ -11,49 +12,57 @@ export class I18nextPluginSvelte implements Plugin {
 	public readonly name = "i18next-cli-plugin-svelte";
 
 	/**
-	 * For every .svelte input file attempts component compilation
-	 * to i18next-parseable JS source code file for further key
-	 * extraction.
+	 * Extracts JS code from Svelte component `<script>` or `<script module>`,
+	 * Svelte templates and attribute value expressions.
+	 *
 	 * @param code raw source code to process
 	 * @param path path to the source file
-	 * @returns generated JS code from .svelte component or
-	 *   undefined for non-Svelte files
+	 * @returns extracted JS code from .svelte component or
+	 *   `undefined` for non-Svelte files
 	 */
 	onLoad(code: string, path: string): string | undefined {
 		// Passthrough for non-Svelte files
 		if (!path.match(/\.svelte$/)) return undefined;
 
-		const fromAst = (node: any) => code.slice(node.content.start, node.content.end);
-		const fromEstree = (node: any) =>
-			node.type === "MustacheTag"
-				? `(${code.slice(node.expression.start, node.expression.end)})`
-				: undefined;
-
 		const ast = parse(code, { filename: path }) as AST.Root & { html: any };
-		const extracted: string[] = [];
+		const extractedBody: any[] = [];
 
 		// extract from the <script> tag
-		if (ast.instance) extracted.push(fromAst(ast.instance));
-		if (ast.module) extracted.push(fromAst(ast.module));
+		if (ast.instance) {
+			extractedBody.push(...(ast.instance.content as any).body);
+		}
+		if (ast.module) {
+			extractedBody.push(...(ast.module.content as any).body);
+		}
 
 		// extract from HTML
 		if (ast.html?.children?.length != 0) {
 			walk(ast.html, {
-				enter(node) {
-					const stmt = fromEstree(node);
-					if (stmt) extracted.push(stmt);
+				enter(node: any) {
+					if (node.type === "MustacheTag") {
+						// Wrap the expression in an ExpressionStatement to make it a valid JS statement
+						extractedBody.push({
+							type: "ExpressionStatement",
+							expression: node.expression
+						});
+					}
 				}
 			});
 		}
 
 		// When contatenating make sure we don't cause issues with ASI
-		return extracted.join("\n;");
+		// Cast to any to satisfy astring's strict Node typing
+		return generate({
+			type: "Program",
+			body: extractedBody,
+			sourceType: "module"
+		} as any);
 	}
 
 	/**
-	 * Unwraps Svelte 5 rune wrappers ($derived.by / $derived) around
-	 * useTranslation-style hooks so the extractor can resolve the
-	 * namespace and keyPrefix that would otherwise be lost.
+	 * Unwraps Svelte 5 rune wrappers (`$derived.by` and `$derived`) around
+	 * `useTranslation`-style hooks so the extractor can resolve the
+	 * `namespace` and `keyPrefix` that would otherwise be lost.
 	 *
 	 * @see https://github.com/dreamscached/i18next-cli-plugin-svelte/issues/5
 	 * @see https://github.com/i18next/i18next-cli/issues/231
@@ -86,9 +95,9 @@ export class I18nextPluginSvelte implements Plugin {
 		const hookName: string = innerCall.callee.value;
 
 		// Check if the inner call matches a registered useTranslationNames entry
-		const useTranslationNames = context.config.extract.useTranslationNames ?? [
-			"useTranslation"
-		];
+		// prettier-ignore
+		const useTranslationNames = context.config.extract.useTranslationNames ?? ["useTranslation"];
+
 		let nsArgIndex = 0;
 		let kpArgIndex = 1;
 		let matched = false;
