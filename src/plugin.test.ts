@@ -417,6 +417,81 @@ console.log("World!");
 				expected: {
 					key_attr: "Default Attr"
 				}
+			},
+			{
+				name: "unwraps TS-specific wrappers (as, !, types)",
+				source: `
+					<script lang="ts">
+						const { t } = getContext();
+						const a = t('key-as' as any, 'Default As');
+						const b = t('key-non-null'!, 'Default Non-Null');
+						const c = t(<string>'key-assert', 'Default Assertion');
+					</script>
+				`,
+				expected: {
+					"key-as": "Default As",
+					"key-non-null": "Default Non-Null",
+					"key-assert": "Default Assertion"
+				}
+			},
+			{
+				name: "skips TS metadata (interfaces, types, generics)",
+				source: `
+					<script lang="ts">
+						import { t } from "i18next";
+
+						interface User<T extends string> {
+							name: T;
+							role: 'admin' | 'guest';
+						}
+
+						type Handler = (id: number) => void;
+						const msg = t<string>('generic-key', 'Generic Default');
+					</script>
+				`,
+				expected: {
+					"generic-key": "Generic Default"
+				}
+			},
+			{
+				name: "extracts from TS Enums (if used as values)",
+				source: `
+					<script lang="ts">
+						import { t } from "i18next";
+						enum Status {
+							Active = t('status-active', 'Active'),
+							Pending = t('status-pending', 'Pending')
+						}
+					</script>
+				`,
+				expected: {
+					"status-active": "Active",
+					"status-pending": "Pending"
+				}
+			},
+			{
+				// https://github.com/dreamscached/i18next-cli-plugin-svelte/issues/10
+				name: "pr#10 specific case (TS interface)",
+				source: `
+					<script lang="ts">
+						import { getTranslationContext } from '@codeggs/translation-context';
+
+						interface Props {
+							id: string;
+						}
+
+						const { t } = $derived.by(getTranslationContext('ui-form'));
+
+						const { id  }: Props = $props();
+					</script>
+
+					<div {id}>
+						{t('hello-world', 'hello world!')}
+					</div>
+				`,
+				expected: {
+					"hello-world": "hello world!"
+				}
 			}
 		])("$name", async ({ source, expected }) => {
 			await writeFile(join(tempDir, "src/App.svelte"), source);

@@ -1,8 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { generate } from "astring";
+import { generate, GENERATOR } from "astring";
 import { walk } from "estree-walker";
 import type { Plugin, PluginContext } from "i18next-cli";
 import { parse, type AST } from "svelte/compiler";
+
+type AstGenerator = typeof GENERATOR;
 
 /**
  * Enables I18next to extract translation keys from .svelte component files.
@@ -10,6 +12,48 @@ import { parse, type AST } from "svelte/compiler";
 export class I18nextPluginSvelte implements Plugin {
 	/** i18next-cli plugin name. */
 	public readonly name = "i18next-cli-plugin-svelte";
+	private readonly generator = this.createTypescriptAstGenerator();
+
+	/**
+	 * Creates a new AST generator to process Typescript specific syntax.
+	 * @returns an extended astree's {@link GENERATOR} object.
+	 */
+	private createTypescriptAstGenerator(): AstGenerator {
+		return new Proxy(
+			{
+				...GENERATOR,
+				TSAsExpression(node, state) {
+					// unwrap 'x as y'
+					this[node.expression.type]?.(node.expression, state);
+				},
+				TSNonNullExpression(node, state) {
+					// unwrap 'x!!'
+					this[node.expression.type]?.(node.expression, state);
+				},
+				TSTypeAssertion(node, state) {
+					// unwrap '<y> x'
+					this[node.expression.type]?.(node.expression, state);
+				},
+				TSInstantiationExpression(node, state) {
+					// unwrap 'const/let x: y = ...'
+					this[node.expression.type]?.(node.expression, state);
+				},
+				TSModuleBlock(node, state) {
+					// pass children inside 'declare module {...}'
+					for (const statement of node.body) {
+						this[statement.type]?.(statement, state);
+					}
+				}
+			},
+			{
+				/** Catch-all to ignore any TS-prefixed AST nodes if undefined. */
+				get(target: AstGenerator, prop: string) {
+					if (!(prop in target) && prop.startsWith("TS")) return () => {};
+					return target[prop];
+				}
+			}
+		);
+	}
 
 	/**
 	 * Extracts JS code from Svelte component `<script>` or `<script module>`,
@@ -50,13 +94,34 @@ export class I18nextPluginSvelte implements Plugin {
 			});
 		}
 
+		// This handles rare case when translated strings are
+		// used as enum value initializers
+		for (let i = extractedBody.length - 1; i >= 0; i--) {
+			const thisNode = extractedBody[i];
+			if (thisNode.type === "TSEnumDeclaration") {
+				extractedBody.splice(i, 1);
+				walk(thisNode, {
+					enter(node: any) {
+						if (node.type === "TSEnumMember") {
+							extractedBody.push(node.initializer);
+						}
+					}
+				});
+			}
+		}
+
 		// When contatenating make sure we don't cause issues with ASI
 		// Cast to any to satisfy astring's strict Node typing
-		return generate({
-			type: "Program",
-			body: extractedBody,
-			sourceType: "module"
-		} as any);
+		return generate(
+			{
+				type: "Program",
+				body: extractedBody,
+				sourceType: "module"
+			} as any,
+			{
+				generator: this.generator
+			}
+		);
 	}
 
 	/**
