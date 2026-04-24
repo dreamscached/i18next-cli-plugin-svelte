@@ -1,5 +1,4 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { generate } from "astring";
 import { walk } from "estree-walker";
 import type { Plugin, PluginContext } from "i18next-cli";
 import { parse, type AST } from "svelte/compiler";
@@ -24,39 +23,31 @@ export class I18nextPluginSvelte implements Plugin {
 		// Passthrough for non-Svelte files
 		if (!path.match(/\.svelte$/)) return undefined;
 
+		const fromAst = (node: any) => code.slice(node.content.start, node.content.end);
+		const fromEstree = (node: any) =>
+			node.type === "MustacheTag"
+				? `(${code.slice(node.expression.start, node.expression.end)})`
+				: undefined;
+
 		const ast = parse(code, { filename: path }) as AST.Root & { html: any };
-		const extractedBody: any[] = [];
+		const extracted: string[] = [];
 
 		// extract from the <script> tag
-		if (ast.instance) {
-			extractedBody.push(...(ast.instance.content as any).body);
-		}
-		if (ast.module) {
-			extractedBody.push(...(ast.module.content as any).body);
-		}
+		if (ast.instance) extracted.push(fromAst(ast.instance));
+		if (ast.module) extracted.push(fromAst(ast.module));
 
 		// extract from HTML
 		if (ast.html?.children?.length != 0) {
 			walk(ast.html, {
-				enter(node: any) {
-					if (node.type === "MustacheTag") {
-						// Wrap the expression in an ExpressionStatement to make it a valid JS statement
-						extractedBody.push({
-							type: "ExpressionStatement",
-							expression: node.expression
-						});
-					}
+				enter(node) {
+					const stmt = fromEstree(node);
+					if (stmt) extracted.push(stmt);
 				}
 			});
 		}
 
 		// When contatenating make sure we don't cause issues with ASI
-		// Cast to any to satisfy astring's strict Node typing
-		return generate({
-			type: "Program",
-			body: extractedBody,
-			sourceType: "module"
-		} as any);
+		return extracted.join("\n;");
 	}
 
 	/**

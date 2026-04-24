@@ -9,28 +9,34 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import I18nextSveltePlugin from "./index.js";
 
+function pathEndsWith(p: string | undefined, suffix: string): boolean {
+	if (!p) return false;
+	return p.replace(/\\/g, "/").endsWith(suffix);
+}
+
 describe("I18nextSveltePlugin", () => {
 	describe("should extract valid js code", () => {
 		it.each([
 			{
 				name: "example Svelte component",
 				source: `
-					<script>
-						import i18n from "i18next-cli";
-						console.log(i18n.t("sample.translation.key"));
-					</script>
+				<script>
+					import i18n from "i18next-cli";
+					console.log(i18n.t("sample.translation.key"));
+				</script>
 
-					<div class="mydiv">Hello world!</div>
+				<div class="mydiv">Hello world!</div>
 
-					<style>
-						.mydiv {
-							color: black;
-						}
-					</style>
+				<style>
+					.mydiv {
+						color: black;
+					}
+				</style>
 				`,
-				expected: `import i18n from "i18next-cli";
-console.log(i18n.t("sample.translation.key"));
-`
+				expected: `
+					import i18n from "i18next-cli";
+					console.log(i18n.t("sample.translation.key"));
+				`
 			},
 			{
 				name: "one empty <script> tag",
@@ -50,37 +56,36 @@ console.log(i18n.t("sample.translation.key"));
 			{
 				name: "instance with a module <script> tag",
 				source: `
-					<script module>export const myval = 42;</script>
-					<script>console.log("Hello");</script>
+				<script module>export const myval = 42;</script>
+				<script>console.log("Hello");</script>
 				`,
 				expected: `console.log("Hello");
-export const myval = 42;
-`
+;export const myval = 42;`
 			},
 			{
 				name: "one empty <script module> tag",
-				source: `<script module></script>`,
-				expected: ``
+				source: `<script module>export const foobar = "bar";</script>`,
+				expected: `export const foobar = "bar";`
 			},
 			{
 				name: "multiple statements in <script> with no semicolons",
 				source: `<script>console.log("Hello")\nconsole.log("World!")</script>`,
-				expected: `console.log("Hello");
-console.log("World!");
-`
+				expected: `console.log("Hello")
+console.log("World!")`
 			},
 			{
 				name: "asi-unsafe component with instance and module <script> tags",
-				source: `
-					<script>
-						const data = [1, 2, 3]
-					</script>
-					<script context="module">
-						[4, 5, 6].forEach(n => console.log(n))
-					</script>
-				`,
-				expected: `const data = [1, 2, 3];
-[4, 5, 6].forEach(n => console.log(n));
+				source: `<script>
+const data = [1, 2, 3]
+</script>
+<script context="module">
+[4, 5, 6].forEach(n => console.log(n))
+</script>`,
+				expected: `
+const data = [1, 2, 3]
+
+;
+[4, 5, 6].forEach(n => console.log(n))
 `
 			}
 		])("$name", ({ source, expected }) => {
@@ -95,38 +100,33 @@ console.log("World!");
 		it.each([
 			{
 				name: "text tag (i18next.t)",
-				source: `<div>{i18next.t('key1')}</div>`,
-				expected: `i18next.t('key1');
-`
+				source: "<div>{i18next.t('key1')}</div>",
+				expected: "(i18next.t('key1'))"
 			},
 			{
 				name: "attribute tag (i18next.t)",
-				source: `<button title={i18next.t('key2')}></button>`,
-				expected: `i18next.t('key2');
-`
+				source: "<button title={i18next.t('key2')}></button>",
+				expected: "(i18next.t('key2'))"
 			},
 			{
 				name: "text tag (t)",
-				source: `<div>{t('key1')}</div>`,
-				expected: `t('key1');
-`
+				source: "<div>{t('key1')}</div>",
+				expected: "(t('key1'))"
 			},
 			{
 				name: "attribute tag (t)",
-				source: `<button title={t('key2')}></button>`,
-				expected: `t('key2');
-`
+				source: "<button title={t('key2')}></button>",
+				expected: "(t('key2'))"
 			},
 			{
 				name: "non-key tag",
-				source: `<div>{variable}</div>`,
-				expected: `variable;
-`
+				source: "<div>{variable}</div>",
+				expected: "(variable)"
 			},
 			{
 				name: "empty html",
-				source: `<script></script>`,
-				expected: ``
+				source: "<script></script>",
+				expected: ""
 			}
 		])("$name", ({ source, expected }) => {
 			const plugin = new I18nextSveltePlugin();
@@ -139,23 +139,22 @@ console.log("World!");
 		it.each([
 			{
 				path: "test.svelte",
-				source: `<script>console.log('test')</script>`,
-				expected: `console.log('test');
-`
+				source: "<script>console.log('test')</script>",
+				expected: "console.log('test')"
 			},
 			{
 				path: "test.ts",
-				source: `<foobar> invalid svelte/ts code`,
+				source: "<foobar> invalid svelte/ts code",
 				expected: undefined
 			},
 			{
 				path: "test.svelte.ts",
-				source: `<foobar> invalid svelte/ts code`,
+				source: "<foobar> invalid svelte/ts code",
 				expected: undefined
 			},
 			{
 				path: "svelte.ts",
-				source: `<foobar> invalid svelte/ts code`,
+				source: "<foobar> invalid svelte/ts code",
 				expected: undefined
 			}
 		])("$path", ({ path, source, expected }) => {
@@ -167,11 +166,6 @@ console.log("World!");
 
 	describe("should unwrap $derived/$derived.by svelte runes", () => {
 		let tempDir: string;
-
-		function pathEndsWith(p: string | undefined, suffix: string): boolean {
-			if (!p) return false;
-			return p.replace(/\\/g, "/").endsWith(suffix);
-		}
 
 		beforeEach(async () => {
 			tempDir = await mkdtemp(join(tmpdir(), "i18next-svelte-test-"));
