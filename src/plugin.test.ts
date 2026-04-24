@@ -378,7 +378,8 @@ const data = [1, 2, 3]
 					input: [join(tempDir, "src/**/*.svelte")],
 					output: join(tempDir, "locales/{{language}}/{{namespace}}.json"),
 					functions: ["t", "i18next.t"],
-					defaultNS: "translation"
+					defaultNS: "translation",
+					useTranslationNames: ["useTranslation", "getTranslationContext"]
 				},
 				plugins: [new I18nextSveltePlugin()]
 			};
@@ -394,6 +395,7 @@ const data = [1, 2, 3]
                     </script>
                     <div>{t('key_html', 'Default HTML')}</div>
                 `,
+				path: "/en/translation.json",
 				expected: {
 					key_script: "Default Script",
 					key_html: "Default HTML"
@@ -408,14 +410,38 @@ const data = [1, 2, 3]
 					<button title={t('key_attr', 'Default Attr')}>
 					</button>
 				`,
+				path: "/en/translation.json",
 				expected: {
 					key_attr: "Default Attr"
 				}
+			},
+			{
+				// https://github.com/dreamscached/i18next-cli-plugin-svelte/issues/10
+				name: "handles typescript with interface",
+				source: `
+					<script lang="ts">
+						import { getTranslationContext } from './translation-context';
+
+						interface Props {
+							id: string;
+						}
+
+						const { t } = $derived.by(getTranslationContext('ui-form'));
+						const { id }: Props = $props();
+					</script>
+					<div {id}>
+						{t('hello-world', "Hello World!")}
+					</div>
+				`,
+				path: "/en/ui-form.json",
+				expected: {
+					"hello-world": "Hello World!"
+				}
 			}
-		])("$name", async ({ source, expected }) => {
+		])("$name", async ({ source, expected, path }) => {
 			await writeFile(join(tempDir, "src/App.svelte"), source);
 			const results = await extract(makeConfig());
-			const defaultFile = results.find((r) => pathEndsWith(r.path, "/en/translation.json"));
+			const defaultFile = results.find((r) => pathEndsWith(r.path, path));
 			expect(defaultFile).toBeDefined();
 			expect(defaultFile!.newTranslations).toEqual(expected);
 		});
