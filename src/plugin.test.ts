@@ -135,6 +135,65 @@ const data = [1, 2, 3]
 		});
 	});
 
+	describe("should extract statements from svelte tags", () => {
+		it.each([
+			{
+				name: "from {@html}",
+				source: "<div>{@html getHtmlWithTrans(t('key1'))}</div>",
+				expected: "(getHtmlWithTrans(t('key1')))"
+			},
+			{
+				name: "from {@render}",
+				source: "{@render snippetWithTrans(t('key1'))}",
+				expected: "(snippetWithTrans(t('key1')))"
+			},
+			{
+				name: "from {@attach}",
+				source: "<div {@attach fnWithTrans(t('key1'))}></div>",
+				expected: "(fnWithTrans(t('key1')))"
+			},
+			{
+				name: "from {@const}",
+				source: "{@const foobar = t('key1')}",
+				expected: "(foobar = t('key1'))"
+			},
+			{
+				name: "from {#if} (no else-if)",
+				source: "{#if t('key1')}{/if}",
+				expected: "(t('key1'))"
+			},
+			{
+				name: "from {#if} (with else-if)",
+				source: "{#if t('key1')}{:else if t('key2')}{/if}",
+				expected: "(t('key1'))\n;(t('key2'))"
+			},
+			{
+				name: "from {#each}",
+				source: "{#each t('key1')}{/each}",
+				expected: "(t('key1'))"
+			},
+			{
+				name: "from {#key}",
+				source: "{#key t('key1')}{/key}",
+				expected: "(t('key1'))"
+			},
+			{
+				name: "from {#await}",
+				source: "{#await t('key1')}{/await}",
+				expected: "(t('key1'))"
+			},
+			{
+				name: "from {#snippet}",
+				source: "{#snippet foo(arg=t('key1'))}{/snippet}",
+				expected: "((arg=t('key1'));)"
+			}
+		])("$name", ({ source, expected }) => {
+			const plugin = new I18nextSveltePlugin();
+			const extracted = plugin.onLoad!(source, "test.svelte");
+			expect(extracted).toEqual(expected);
+		});
+	});
+
 	describe("should skip non-svelte files", () => {
 		it.each([
 			{
