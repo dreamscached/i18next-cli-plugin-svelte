@@ -23,24 +23,53 @@ export class I18nextPluginSvelte implements Plugin {
 		// Passthrough for non-Svelte files
 		if (!path.match(/\.svelte$/)) return undefined;
 
-		const fromAst = (node: any) => code.slice(node.content.start, node.content.end);
-		const fromEstree = (node: any) =>
-			node.type === "MustacheTag"
-				? `(${code.slice(node.expression.start, node.expression.end)})`
-				: undefined;
+		const fromSvelteAst = (node: any) => code.slice(node.content.start, node.content.end);
+		const fromEstreeAst = (node: any) => {
+			switch (node.type) {
+				case "MustacheTag": // .expression
+				case "RawMustacheTag":
+				case "HtmlTag":
+				case "RenderTag":
+				case "AttachTag":
+				case "ConstTag":
+				case "IfBlock":
+				case "EachBlock":
+				case "KeyBlock":
+				case "AwaitBlock":
+					return `(${code.slice(node.expression.start, node.expression.end)})`;
+				case "SnippetBlock": // needs js-like tree handling
+					return `(${fromNestedJs(node.parameters ?? [])})`;
+				default:
+					return undefined;
+			}
+		};
+
+		const fromNestedJs = (root: any) => {
+			const strings: string[] = [];
+			walk(root, {
+				enter(node: any) {
+					switch (node.type) {
+						case "AssignmentPattern":
+							strings.push(`(${code.slice(node.start, node.end)});`);
+							break;
+					}
+				}
+			});
+			return strings.join("\n;");
+		};
 
 		const ast = parse(code, { filename: path }) as AST.Root & { html: any };
 		const extracted: string[] = [];
 
 		// extract from the <script> tag
-		if (ast.instance) extracted.push(fromAst(ast.instance));
-		if (ast.module) extracted.push(fromAst(ast.module));
+		if (ast.instance) extracted.push(fromSvelteAst(ast.instance));
+		if (ast.module) extracted.push(fromSvelteAst(ast.module));
 
 		// extract from HTML
 		if (ast.html?.children?.length != 0) {
 			walk(ast.html, {
 				enter(node) {
-					const stmt = fromEstree(node);
+					const stmt = fromEstreeAst(node);
 					if (stmt) extracted.push(stmt);
 				}
 			});
