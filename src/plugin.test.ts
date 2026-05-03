@@ -375,6 +375,46 @@ const data = [1, 2, 3]
 				expectedTranslations: {
 					"hello-world": "Hello World"
 				}
+			},
+			{
+				name: "handles namespace array (Svelte)",
+				filename: "src/App.svelte",
+				source: `
+					<script>
+						const { t } = $derived.by(getTranslationContext(['my-namespace', 'my-fallback-namespace']));
+					</script>
+					<div>
+						{t('hello-world', 'Hello World!')}
+					</div>
+				`,
+				configOverrides: {
+					useTranslationNames: [
+						"getTranslationContext"
+					]
+				},
+				expectedNamespace: "/en/my-namespace.json",
+				expectedTranslations: {
+					"hello-world": "Hello World!"
+				}
+			},
+			{
+				name: "handles namespace array (ts)",
+				filename: "src/app.svelte.ts",
+				source: `
+					const hello = () => {
+						const { t } = getTranslationContext(['my-namespace', 'my-fallback-namespace']);
+						return { label: t('hello-world', 'Hello World!') };
+					};
+				`,
+				configOverrides: {
+					useTranslationNames: [
+						"getTranslationContext"
+					]
+				},
+				expectedNamespace: "/en/my-namespace.json",
+				expectedTranslations: {
+					"hello-world": "Hello World!"
+				}
 			}
 			// FIXME: this should work, but it doesn't; this is bad!
 			// {

@@ -88,8 +88,14 @@ export class I18nextPluginSvelte implements Plugin {
 	 * @see https://github.com/i18next/i18next-cli/issues/231
 	 */
 	onVisitNode(node: any, context: PluginContext): void {
-		if (node.type !== "VariableDeclarator") return;
+		switch (node.type) {
+			case "VariableDeclarator":
+				this.handleDerivedBy(node, context);
+				break;
+		}
+	}
 
+	private handleDerivedBy(node: any, context: PluginContext) {
 		const init = node.init;
 		if (!init || init.type !== "CallExpression") return;
 
@@ -116,7 +122,8 @@ export class I18nextPluginSvelte implements Plugin {
 
 		// Check if the inner call matches a registered useTranslationNames entry
 		// prettier-ignore
-		const useTranslationNames = context.config.extract.useTranslationNames ?? ["useTranslation"];
+		const useTranslationNames = context.config.extract.useTranslationNames;
+		if (!useTranslationNames) return;
 
 		let nsArgIndex = 0;
 		let kpArgIndex = 1;
@@ -137,14 +144,30 @@ export class I18nextPluginSvelte implements Plugin {
 
 		if (!matched) return;
 
+		const getDefaultNsNode = (node: any) => {
+			switch (node?.type) {
+				case "StringLiteral":
+					return node.value;
+				case "ArrayExpression":
+					return (() => {
+						const expressions = node.elements.map((it: any) => it.expression);
+						// prettier-ignore
+						const isStringArray = expressions.every((it: any) => it.type === "StringLiteral");
+						if (!isStringArray) return undefined;
+						return expressions[0]?.value ?? undefined;
+					})();
+				default:
+					return undefined;
+			}
+		};
+
 		// Extract namespace and keyPrefix from the inner call's arguments
 		const nsNode =
 			nsArgIndex !== -1 ? innerCall.arguments?.[nsArgIndex]?.expression : undefined;
 		const kpNode =
 			kpArgIndex !== -1 ? innerCall.arguments?.[kpArgIndex]?.expression : undefined;
 
-		const defaultNs: string | undefined =
-			nsNode?.type === "StringLiteral" ? nsNode.value : undefined;
+		const defaultNs: string | undefined = getDefaultNsNode(nsNode);
 		const keyPrefix: string | undefined =
 			kpNode?.type === "StringLiteral" ? kpNode.value : undefined;
 
