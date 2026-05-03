@@ -145,7 +145,7 @@ export class I18nextPluginSvelte implements Plugin {
 		if (!matched) return;
 
 		const getDefaultNsNode = (node: any) => {
-			switch (node.type) {
+			switch (node?.type) {
 				case "StringLiteral":
 					return node.value;
 				case "ArrayExpression":
