@@ -186,6 +186,16 @@ const data = [1, 2, 3]
 				name: "from {#snippet}",
 				source: "{#snippet foo(arg=t('key1'))}{/snippet}",
 				expected: "((arg=t('key1'));)"
+			},
+			{
+				// https://github.com/dreamscached/i18next-cli-plugin-svelte/issues/14
+				name: "from {#snippet}",
+				source: `
+					{#snippet hello(variable)}
+						{variable}
+					{/snippet}
+				`,
+				expected: "(variable)"
 			}
 		])("$name", ({ source, expected }) => {
 			const plugin = new I18nextSveltePlugin();

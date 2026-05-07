@@ -26,7 +26,7 @@ export class I18nextPluginSvelte implements Plugin {
 		const fromSvelteAst = (node: any) => code.slice(node.content.start, node.content.end);
 		const fromEstreeAst = (node: any) => {
 			switch (node.type) {
-				case "MustacheTag": // .expression
+				case "MustacheTag": // these have .expression
 				case "RawMustacheTag":
 				case "HtmlTag":
 				case "RenderTag":
@@ -38,7 +38,11 @@ export class I18nextPluginSvelte implements Plugin {
 				case "AwaitBlock":
 					return `(${code.slice(node.expression.start, node.expression.end)})`;
 				case "SnippetBlock": // needs js-like tree handling
-					return `(${fromNestedJs(node.parameters ?? [])})`;
+					{
+						const js = fromNestedJs(node.parameters ?? []);
+						if (!js.length) return undefined;
+						return `(${js})`;
+					}
 				default:
 					return undefined;
 			}
