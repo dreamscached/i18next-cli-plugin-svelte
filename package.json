@@ -38,7 +38,9 @@
     "default": "./dist/index.js"
   },
   "files": [
-    "./dist"
+    "dist",
+    "README.md",
+    "LICENSE"
   ],
   "peerDependencies": {
     "estree-walker": "^3.0.3",
