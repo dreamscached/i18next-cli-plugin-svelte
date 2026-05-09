@@ -1,5 +1,4 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-
 import type * as estree from "estree";
 import { walk } from "estree-walker";
 import { type AST } from "svelte/compiler";
@@ -9,8 +8,17 @@ export function extractScriptIIFE(script: AST.Script): estree.ExpressionStatemen
 	// need to convert them to 'const {} = await import' first.
 	walk(script as any, {
 		enter(node) {
-			if (node.type === "ImportDeclaration") {
-				this.replace(toConstImport(node));
+			switch (node.type) {
+				case "ImportDeclaration":
+					this.replace(transformImport(node));
+					break;
+				case "MetaProperty":
+					this.replace(transformImportMeta(node));
+					break;
+				case "ExportNamedDeclaration":
+				case "ExportDefaultDeclaration":
+					this.replace(transformExport(node));
+					break;
 			}
 		}
 	});
@@ -18,13 +26,13 @@ export function extractScriptIIFE(script: AST.Script): estree.ExpressionStatemen
 	return toIIFE(script.content.body as unknown as estree.Statement[]);
 }
 
-export function extractTemplateIIFE(html: AST.Fragment): estree.ExpressionStatement {
-    const statements: estree.Statement[] = [];
+export function extractTemplateExpr(html: AST.Fragment): estree.ExpressionStatement[] {
+	const statements: estree.ExpressionStatement[] = [];
 
-    walk(html as any, {
+	walk(html as any, {
 		// @ts-expect-error we're walking Svelte AST here
-        enter(node: AST.BaseNode) {
-            switch (node.type) {
+		enter(node: AST.BaseNode) {
+			switch (node.type) {
 				case "MustacheTag":
 				case "RawMustacheTag":
 				case "HtmlTag":
@@ -40,14 +48,15 @@ export function extractTemplateIIFE(html: AST.Fragment): estree.ExpressionStatem
 						expression: (node as any).expression
 					});
 					break;
-            }
-        }
-    });
+				// TODO: snippet
+			}
+		}
+	});
 
-    return toIIFE(statements);
+	return statements;
 }
 
-function toConstImport(
+function transformImport(
 	node: estree.ImportDeclaration
 ): estree.VariableDeclaration | estree.ExpressionStatement {
 	// 'await' expression common for any imports
@@ -133,18 +142,71 @@ function toIIFE(nodes: estree.Statement[]): estree.ExpressionStatement {
 		type: "ExpressionStatement",
 		expression: {
 			type: "CallExpression",
+			arguments: [],
 			optional: false,
 			callee: {
 				type: "ArrowFunctionExpression",
+				params: [],
 				expression: false,
 				async: true,
-				params: [],
 				body: {
 					type: "BlockStatement",
 					body: nodes
 				}
-			},
-			arguments: []
+			}
 		}
 	};
+}
+
+function transformExport(
+	exportNode: estree.ExportNamedDeclaration | estree.ExportDefaultDeclaration
+): estree.Statement {
+	// Named exports: export const x = 1; export function f() {}
+	if (exportNode.type === "ExportNamedDeclaration") {
+		if (exportNode.declaration) {
+			// Simply return the declaration (const/let/var/function/class)
+			// The 'export' keyword is effectively stripped here.
+			return exportNode.declaration;
+		}
+
+		// Handle: export { x }; (references only, no logic to extract)
+		return { type: "EmptyStatement" };
+	}
+
+	// Default Exports: export default ...
+	const decl = exportNode.declaration;
+
+	// Handle Function/Class Declarations (which might be anonymous)
+	if (decl.type === "FunctionDeclaration" || decl.type === "ClassDeclaration") {
+		if (decl.id) {
+			return decl as estree.Statement;
+		}
+
+		// If anonymous, we convert to an expression to satisfy 'Statement' type
+		return {
+			type: "ExpressionStatement",
+			expression: {
+				...decl,
+				type: decl.type === "FunctionDeclaration" ? "FunctionExpression" : "ClassExpression"
+			} as estree.FunctionExpression | estree.ClassExpression
+		};
+	}
+
+	// Expressions: export default t('key'); or export default { a: t('b') };
+	// Wrap in an ExpressionStatement to keep it as a valid Statement in the IIFE body
+	return {
+		type: "ExpressionStatement",
+		expression: decl as estree.Expression
+	};
+}
+
+function transformImportMeta(node: estree.Node): estree.Node {
+	if (node.type === "MetaProperty" && node.meta.name === "import") {
+		// Replace with a dummy identifier or object
+		return {
+			type: "ObjectExpression",
+			properties: []
+		};
+	}
+	return node;
 }
