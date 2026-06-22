@@ -142,7 +142,7 @@ export class I18nextPluginSvelte implements Plugin {
 				}
 			}
 		} else if (node.id.type === "Identifier") {
-			// FIXME: this never fires?
+			// Non-destructured assignment, e.g. const i18n = $derived.by(...)
 			context.setVarInScope(node.id.value, scopeInfo);
 		}
 	}

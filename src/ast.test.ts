@@ -153,6 +153,66 @@ describe("extractScriptIIFE", () => {
 			output: `(async () => {
     const foo = {}.foo;
 })();`
+		},
+		{
+			// export { x }; has no declaration to extract, so it's dropped
+			source: `
+                <script>
+                    const x = 1;
+                    export { x };
+                </script>
+            `,
+			output: `(async () => {
+    const x = 1;
+})();`
+		},
+		{
+			// export default function foo() {} keeps the named declaration
+			source: `
+                <script>
+                    export default function foo() {}
+                </script>
+            `,
+			output: `(async () => {
+    function foo() {}
+})();`
+		},
+		{
+			// anonymous default function becomes a function expression
+			source: `
+                <script>
+                    export default function () {}
+                </script>
+            `,
+			output: `(async () => {
+    (function() {});
+})();`
+		},
+		{
+			// anonymous default class becomes a class expression
+			source: `
+                <script>
+                    export default class {}
+                </script>
+            `,
+			output: `(async () => {
+    (class {});
+})();`
+		},
+		{
+			// new.target is a MetaProperty but not import.meta, so it's left as-is
+			source: `
+                <script>
+                    function f() {
+                        return new.target;
+                    }
+                </script>
+            `,
+			output: `(async () => {
+    function f() {
+        return new.target;
+    }
+})();`
 		}
 	])("should convert/strip iife-unsafe constructs", ({ source, output }) => {
 		const ast = parse(source) as AST.Root;
