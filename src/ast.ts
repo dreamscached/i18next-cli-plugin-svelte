@@ -1,18 +1,38 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import type * as estree from "estree";
 import { walk } from "estree-walker";
 import { type AST } from "svelte/compiler";
 
 /**
+ * Minimal shape of the (legacy) Svelte template nodes we read a JS expression
+ * from. `parse()` returns the legacy AST, but Svelte 5 only ships types for its
+ * modern AST, so we describe the handful of fields we actually touch ourselves.
+ */
+interface SvelteExpressionNode {
+	type:
+		| "MustacheTag"
+		| "RawMustacheTag"
+		| "HtmlTag"
+		| "RenderTag"
+		| "AttachTag"
+		| "ConstTag"
+		| "IfBlock"
+		| "EachBlock"
+		| "KeyBlock"
+		| "AwaitBlock";
+	expression: estree.Expression;
+}
+
+/**
  * Rewrites a Svelte `<script>` AST into IIFE-safe statements: top-level
  * `import`/`export`/`import.meta` constructs are converted to forms that are
- * legal inside a function body. The returned statements are *not* wrapped — use
+ * legal inside a function body. The returned statements are *not* wrapped - use
  * {@link toIIFE} (or {@link extractScriptIIFE}) to do that.
  */
 export function extractScriptStatements(script: AST.Script): estree.Statement[] {
-	// We can't have top-level 'import ...' declaration in IIFE, so we
-	// need to convert them to 'const {} = await import' first.
-	walk(script as any, {
+	// `script.content` is an estree `Program`, so the walk is fully typed. We
+	// can't have top-level 'import ...' declarations in an IIFE, so we convert
+	// them to 'const {} = await import' (and strip exports) first.
+	walk(script.content, {
 		enter(node) {
 			switch (node.type) {
 				case "ImportDeclaration":
@@ -29,6 +49,8 @@ export function extractScriptStatements(script: AST.Script): estree.Statement[] 
 		}
 	});
 
+	// Imports/exports have been rewritten into statements above, so the body no
+	// longer contains ModuleDeclarations despite what the static type says.
 	return script.content.body as unknown as estree.Statement[];
 }
 
@@ -40,10 +62,12 @@ export function extractScriptStatements(script: AST.Script): estree.Statement[] 
 export function extractTemplateStatements(fragment: AST.Fragment): estree.ExpressionStatement[] {
 	const statements: estree.ExpressionStatement[] = [];
 
-	walk(fragment as any, {
-		// @ts-expect-error we're walking Svelte AST here
-		enter(node: AST.BaseNode) {
-			switch (node.type) {
+	// estree-walker is typed for estree, but the Svelte template tree is happily
+	// walkable all the same; we narrow each node to the legacy shapes we read.
+	walk(fragment as unknown as estree.Node, {
+		enter(node) {
+			const svelteNode = node as unknown as SvelteExpressionNode | AST.SnippetBlock;
+			switch (svelteNode.type) {
 				case "MustacheTag":
 				case "RawMustacheTag":
 				case "HtmlTag":
@@ -56,11 +80,11 @@ export function extractTemplateStatements(fragment: AST.Fragment): estree.Expres
 				case "AwaitBlock":
 					statements.push({
 						type: "ExpressionStatement",
-						expression: (node as any).expression
+						expression: svelteNode.expression
 					});
 					break;
 				case "SnippetBlock":
-					statements.push(transformSnippet(node as AST.SnippetBlock));
+					statements.push(transformSnippet(svelteNode));
 					this.remove();
 					break;
 			}
@@ -81,14 +105,12 @@ export function extractTemplateExpr(fragment: AST.Fragment): estree.ExpressionSt
 function transformImport(
 	node: estree.ImportDeclaration
 ): estree.VariableDeclaration | estree.ExpressionStatement {
-	// 'await' expression common for any imports
+	// 'await import(...)' expression common for any imports
 	const awaitExpression: estree.AwaitExpression = {
 		type: "AwaitExpression",
 		argument: {
-			type: "CallExpression",
-			callee: { type: "Import" as any },
-			arguments: [node.source],
-			optional: false
+			type: "ImportExpression",
+			source: node.source
 		}
 	};
 
@@ -233,15 +255,16 @@ function transformImportMeta(node: estree.Node): estree.Node {
 function transformSnippet(snippet: AST.SnippetBlock): estree.ExpressionStatement {
 	const statements: estree.Statement[] = [];
 
-	walk(snippet as any, {
+	// Collect any call expressions inside the snippet (parameter defaults and
+	// body) - that's where translation calls live. The CallExpression nodes are
+	// estree-shaped, so the walk is typed once we cross the Svelte boundary.
+	walk(snippet as unknown as estree.Node, {
 		enter(node) {
-			switch (node.type) {
-				case "CallExpression":
-					statements.push({
-						type: "ExpressionStatement",
-						expression: node
-					});
-					break;
+			if (node.type === "CallExpression") {
+				statements.push({
+					type: "ExpressionStatement",
+					expression: node
+				});
 			}
 		}
 	});

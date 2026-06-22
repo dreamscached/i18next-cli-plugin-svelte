@@ -52,6 +52,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@swc/types": "^0.1.25",
     "@trivago/prettier-plugin-sort-imports": "^6.0.2",
     "@types/estree": "^1.0.8",
     "@types/node": "^25.6.0",
