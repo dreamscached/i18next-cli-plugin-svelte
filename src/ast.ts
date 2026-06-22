@@ -3,7 +3,13 @@ import type * as estree from "estree";
 import { walk } from "estree-walker";
 import { type AST } from "svelte/compiler";
 
-export function extractScriptIIFE(script: AST.Script): estree.ExpressionStatement {
+/**
+ * Rewrites a Svelte `<script>` AST into IIFE-safe statements: top-level
+ * `import`/`export`/`import.meta` constructs are converted to forms that are
+ * legal inside a function body. The returned statements are *not* wrapped — use
+ * {@link toIIFE} (or {@link extractScriptIIFE}) to do that.
+ */
+export function extractScriptStatements(script: AST.Script): estree.Statement[] {
 	// We can't have top-level 'import ...' declaration in IIFE, so we
 	// need to convert them to 'const {} = await import' first.
 	walk(script as any, {
@@ -23,13 +29,18 @@ export function extractScriptIIFE(script: AST.Script): estree.ExpressionStatemen
 		}
 	});
 
-	return toIIFE(script.content.body as unknown as estree.Statement[]);
+	return script.content.body as unknown as estree.Statement[];
 }
 
-export function extractTemplateExpr(html: AST.Fragment): estree.ExpressionStatement[] {
+/**
+ * Collects the JS expressions embedded in a Svelte template fragment (mustache
+ * tags, logic blocks, attribute/snippet expressions) as statements. Snippets
+ * are converted to their own nested IIFEs so their parameter scope is honoured.
+ */
+export function extractTemplateStatements(fragment: AST.Fragment): estree.ExpressionStatement[] {
 	const statements: estree.ExpressionStatement[] = [];
 
-	walk(html as any, {
+	walk(fragment as any, {
 		// @ts-expect-error we're walking Svelte AST here
 		enter(node: AST.BaseNode) {
 			switch (node.type) {
@@ -48,12 +59,23 @@ export function extractTemplateExpr(html: AST.Fragment): estree.ExpressionStatem
 						expression: (node as any).expression
 					});
 					break;
-				// TODO: snippet
+				case "SnippetBlock":
+					statements.push(transformSnippet(node as AST.SnippetBlock));
+					this.remove();
+					break;
 			}
 		}
 	});
 
 	return statements;
+}
+
+export function extractScriptIIFE(script: AST.Script): estree.ExpressionStatement {
+	return toIIFE(extractScriptStatements(script));
+}
+
+export function extractTemplateExpr(fragment: AST.Fragment): estree.ExpressionStatement {
+	return toIIFE(extractTemplateStatements(fragment));
 }
 
 function transformImport(
@@ -137,7 +159,7 @@ function transformImport(
 	};
 }
 
-function toIIFE(nodes: estree.Statement[]): estree.ExpressionStatement {
+export function toIIFE(nodes: estree.Statement[]): estree.ExpressionStatement {
 	return {
 		type: "ExpressionStatement",
 		expression: {
@@ -202,11 +224,27 @@ function transformExport(
 
 function transformImportMeta(node: estree.Node): estree.Node {
 	if (node.type === "MetaProperty" && node.meta.name === "import") {
-		// Replace with a dummy identifier or object
-		return {
-			type: "ObjectExpression",
-			properties: []
-		};
+		// Replace with a dummy object {}
+		return { type: "ObjectExpression", properties: [] };
 	}
 	return node;
+}
+
+function transformSnippet(snippet: AST.SnippetBlock): estree.ExpressionStatement {
+	const statements: estree.Statement[] = [];
+
+	walk(snippet as any, {
+		enter(node) {
+			switch (node.type) {
+				case "CallExpression":
+					statements.push({
+						type: "ExpressionStatement",
+						expression: node
+					});
+					break;
+			}
+		}
+	});
+
+	return toIIFE(statements);
 }

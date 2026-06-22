@@ -2,7 +2,7 @@ import * as recast from "recast";
 import { parse, type AST } from "svelte/compiler";
 import { describe, expect, it } from "vitest";
 
-import { extractScriptIIFE } from "./ast.js";
+import { extractScriptIIFE, extractTemplateExpr as extractTemplateIIFE } from "./ast.js";
 
 describe("extractScriptIIFE", () => {
 	it.each([
@@ -160,4 +160,50 @@ describe("extractScriptIIFE", () => {
 		const js = recast.print(iife).code;
 		expect(js).toEqual(output);
 	});
+
+    it.each([
+        {
+            source: `
+                {#snippet foobar()}
+                {/snippet}
+            `,
+            output: `(async () => {
+    (async () => {})();
+})();`
+        },
+        {
+            source: `
+                {#snippet foobar(x, y=42, z=fn("bar"))}
+                {/snippet}
+            `,
+            output: `(async () => {
+    (async () => {
+        fn("bar");
+    })();
+})();`
+        },
+        {
+            source: `
+                {#snippet foobar(x, y=42, z=fn("bar"))}{/snippet}
+                {#snippet barbaz(x, y, z)}
+                    <div my-attr={fn("bar")}>
+                    </div>
+                {/snippet}
+            `,
+            output: `(async () => {
+    (async () => {
+        fn("bar");
+    })();
+
+    (async () => {
+        fn("bar");
+    })();
+})();`
+        }
+    ])("should convert snippet to iife", ({ source, output }) => {
+        const ast = parse(source) as AST.Root & { html: AST.Fragment };
+		const iife = extractTemplateIIFE(ast.html);
+		const js = recast.print(iife).code;
+		expect(js).toEqual(output);
+    });
 });

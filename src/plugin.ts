@@ -1,7 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { walk } from "estree-walker";
+import type * as estree from "estree";
 import type { Plugin, PluginContext } from "i18next-cli";
+import * as recast from "recast";
 import { parse, type AST } from "svelte/compiler";
+
+import { extractScriptStatements, extractTemplateStatements, toIIFE } from "./ast.js";
 
 /**
  * Enables I18next to extract translation keys from .svelte component files.
@@ -23,64 +26,31 @@ export class I18nextPluginSvelte implements Plugin {
 		// Passthrough for non-Svelte files
 		if (!path.match(/\.svelte$/)) return undefined;
 
-		const fromSvelteAst = (node: any) => code.slice(node.content.start, node.content.end);
-		const fromEstreeAst = (node: any) => {
-			switch (node.type) {
-				case "MustacheTag": // these have .expression
-				case "RawMustacheTag":
-				case "HtmlTag":
-				case "RenderTag":
-				case "AttachTag":
-				case "ConstTag":
-				case "IfBlock":
-				case "EachBlock":
-				case "KeyBlock":
-				case "AwaitBlock":
-					return `(${code.slice(node.expression.start, node.expression.end)})`;
-				case "SnippetBlock": // needs js-like tree handling
-					{
-						const js = fromNestedJs(node.parameters ?? []);
-						if (!js.length) return undefined;
-						return `(${js})`;
-					}
-				default:
-					return undefined;
-			}
+		const ast = parse(code, { filename: path }) as AST.Root & { html: AST.Fragment };
+
+		// Reassemble everything into a single async IIFE. Sharing one lexical
+		// scope mirrors how Svelte runs a component (the template and instance
+		// can see module-level declarations), which lets the extractor resolve
+		// scoped namespaces/keyPrefixes declared in <script> from usages in the
+		// template. The async wrapper also makes top-level `await import(...)`
+		// (rewritten from `import` statements) legal.
+		const body: estree.Statement[] = [];
+
+		// Order matters: declarations must precede the template usages that
+		// reference them. Module scope encloses instance scope encloses template.
+		if (ast.module) body.push(...extractScriptStatements(ast.module));
+		if (ast.instance) body.push(...extractScriptStatements(ast.instance));
+
+		// extract from HTML (mustache tags, svelte blocks, attribute exprs, snippets)
+		if ((ast.html as any)?.children?.length) body.push(...extractTemplateStatements(ast.html));
+
+		const program: estree.Program = {
+			type: "Program",
+			sourceType: "module",
+			body: [toIIFE(body)]
 		};
 
-		const fromNestedJs = (root: any) => {
-			const strings: string[] = [];
-			walk(root, {
-				enter(node: any) {
-					switch (node.type) {
-						case "AssignmentPattern":
-							strings.push(`(${code.slice(node.start, node.end)});`);
-							break;
-					}
-				}
-			});
-			return strings.join("\n;");
-		};
-
-		const ast = parse(code, { filename: path }) as AST.Root & { html: any };
-		const extracted: string[] = [];
-
-		// extract from the <script> tag
-		if (ast.instance) extracted.push(fromSvelteAst(ast.instance));
-		if (ast.module) extracted.push(fromSvelteAst(ast.module));
-
-		// extract from HTML
-		if (ast.html?.children?.length != 0) {
-			walk(ast.html, {
-				enter(node) {
-					const stmt = fromEstreeAst(node);
-					if (stmt) extracted.push(stmt);
-				}
-			});
-		}
-
-		// When contatenating make sure we don't cause issues with ASI
-		return extracted.join("\n;");
+		return recast.print(program).code;
 	}
 
 	/**
