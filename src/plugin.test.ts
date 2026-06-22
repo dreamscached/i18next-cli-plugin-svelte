@@ -4,7 +4,6 @@ import { join } from "node:path";
 
 import { extract } from "i18next-cli";
 import type { I18nextToolkitConfig } from "i18next-cli";
-import { parse } from "svelte/compiler";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import I18nextSveltePlugin from "./index.js";
@@ -15,221 +14,191 @@ function pathEndsWith(p: string | undefined, suffix: string): boolean {
 }
 
 describe("I18nextSveltePlugin", () => {
-	describe("should extract valid js code", () => {
+	describe("onLoad", () => {
 		it.each([
-			{
-				name: "example Svelte component",
-				source: `
-				<script>
-					import i18n from "i18next-cli";
-					console.log(i18n.t("sample.translation.key"));
-				</script>
-
-				<div class="mydiv">Hello world!</div>
-
-				<style>
-					.mydiv {
-						color: black;
-					}
-				</style>
-				`,
-				expected: `
-					import i18n from "i18next-cli";
-					console.log(i18n.t("sample.translation.key"));
-				`
-			},
-			{
-				name: "one empty <script> tag",
-				source: `<script></script>`,
-				expected: ``
-			},
-			{
-				name: "empty file",
-				source: "",
-				expected: ``
-			},
-			{
-				name: "no <script> tag",
-				source: `<div>foobar</div><style>div{}</style>`,
-				expected: ``
-			},
-			{
-				name: "instance with a module <script> tag",
-				source: `
-				<script module>export const myval = 42;</script>
-				<script>console.log("Hello");</script>
-				`,
-				expected: `console.log("Hello");
-;export const myval = 42;`
-			},
-			{
-				name: "one empty <script module> tag",
-				source: `<script module>export const foobar = "bar";</script>`,
-				expected: `export const foobar = "bar";`
-			},
-			{
-				name: "multiple statements in <script> with no semicolons",
-				source: `<script>console.log("Hello")\nconsole.log("World!")</script>`,
-				expected: `console.log("Hello")
-console.log("World!")`
-			},
-			{
-				name: "asi-unsafe component with instance and module <script> tags",
-				source: `<script>
-const data = [1, 2, 3]
-</script>
-<script context="module">
-[4, 5, 6].forEach(n => console.log(n))
-</script>`,
-				expected: `
-const data = [1, 2, 3]
-
-;
-[4, 5, 6].forEach(n => console.log(n))
-`
-			}
-		])("$name", ({ source, expected }) => {
+			{ path: "test.ts", source: "<foobar> invalid svelte/ts code" },
+			{ path: "test.svelte.ts", source: "<foobar> invalid svelte/ts code" },
+			{ path: "svelte.ts", source: "<foobar> invalid svelte/ts code" }
+		])("returns undefined for non-svelte file $path", ({ path, source }) => {
 			const plugin = new I18nextSveltePlugin();
-			const extracted = plugin.onLoad!(source, "test.svelte") as string;
-			expect(() => parse(extracted)).not.toThrow();
-			expect(extracted).toEqual(expected);
+			expect(plugin.onLoad!(source, path)).toBeUndefined();
+		});
+
+		it.each([
+			{ name: "an example component", source: "<script>console.log('test')</script>" },
+			{ name: "an empty file", source: "" },
+			{ name: "a file with no <script> tag", source: "<div>foobar</div><style>div{}</style>" },
+			{ name: "an empty <script> tag", source: "<script></script>" },
+			{ name: "an empty <script module> tag", source: "<script module></script>" },
+			{
+				name: "instance and module scripts",
+				source: `<script module>export const myval = 42;</script><script>console.log("Hello");</script>`
+			}
+		])("returns a string for $name (.svelte)", ({ source }) => {
+			const plugin = new I18nextSveltePlugin();
+			expect(typeof plugin.onLoad!(source, "test.svelte")).toBe("string");
 		});
 	});
 
-	describe("should extract statement from mustache tag", () => {
-		it.each([
-			{
-				name: "text tag (i18next.t)",
-				source: "<div>{i18next.t('key1')}</div>",
-				expected: "(i18next.t('key1'))"
-			},
-			{
-				name: "attribute tag (i18next.t)",
-				source: "<button title={i18next.t('key2')}></button>",
-				expected: "(i18next.t('key2'))"
-			},
-			{
-				name: "text tag (t)",
-				source: "<div>{t('key1')}</div>",
-				expected: "(t('key1'))"
-			},
-			{
-				name: "attribute tag (t)",
-				source: "<button title={t('key2')}></button>",
-				expected: "(t('key2'))"
-			},
-			{
-				name: "non-key tag",
-				source: "<div>{variable}</div>",
-				expected: "(variable)"
-			},
-			{
-				name: "empty html",
-				source: "<script></script>",
-				expected: ""
-			}
-		])("$name", ({ source, expected }) => {
-			const plugin = new I18nextSveltePlugin();
-			const extracted = plugin.onLoad!(source, "test.svelte");
-			expect(extracted).toEqual(expected);
-		});
-	});
+	// The plugin only rewrites a component into JS that i18next-cli can parse;
+	// the actual contract is *which keys end up extracted*. These tests drive
+	// the full extract() pipeline so they stay meaningful regardless of the
+	// exact intermediate JS we emit.
+	describe("key extraction", () => {
+		let tempDir: string;
 
-	describe("should extract statements from svelte tags", () => {
+		beforeEach(async () => {
+			tempDir = await mkdtemp(join(tmpdir(), "i18next-svelte-key-extract-"));
+			await mkdir(join(tempDir, "src"), { recursive: true });
+		});
+
+		afterEach(async () => {
+			await rm(tempDir, { recursive: true, force: true });
+		});
+
+		function makeConfig(): I18nextToolkitConfig {
+			return {
+				locales: ["en"],
+				extract: {
+					input: [join(tempDir, "src/**/*.svelte")],
+					output: join(tempDir, "locales/{{language}}/{{namespace}}.json"),
+					functions: ["t", "i18next.t", "i18n.t"],
+					defaultNS: "translation",
+					useTranslationNames: ["useTranslation", "getTranslationContext"]
+				},
+				plugins: [new I18nextSveltePlugin()]
+			};
+		}
+
 		it.each([
 			{
-				name: "from {@html}",
-				source: "<div>{@html getHtmlWithTrans(t('key1'))}</div>",
-				expected: "(getHtmlWithTrans(t('key1')))"
+				name: "from <script>",
+				source: `
+					<script>
+						import { t } from "i18next";
+						const val = t('key_script', 'Default Script');
+					</script>
+				`,
+				expected: { key_script: "Default Script" }
 			},
 			{
-				name: "from {@render}",
-				source: "{@render snippetWithTrans(t('key1'))}",
-				expected: "(snippetWithTrans(t('key1')))"
+				name: "from <script module>",
+				source: `<script module>const v = t('key_module', 'Default Module');</script>`,
+				expected: { key_module: "Default Module" }
 			},
 			{
-				name: "from {@attach}",
-				source: "<div {@attach fnWithTrans(t('key1'))}></div>",
-				expected: "(fnWithTrans(t('key1')))"
+				name: "from both <script> and template",
+				source: `
+					<script>
+						import { t } from "i18next";
+						const val = t('key_script', 'Default Script');
+					</script>
+					<div>{t('key_html', 'Default HTML')}</div>
+				`,
+				expected: {
+					key_script: "Default Script",
+					key_html: "Default HTML"
+				}
 			},
 			{
-				name: "from {@const}",
-				source: "{@const foobar = t('key1')}",
-				expected: "(foobar = t('key1'))"
+				name: "from an attribute expression",
+				source: `
+					<script>import { t } from "i18next";</script>
+					<button title={t('key_attr', 'Default Attr')}></button>
+				`,
+				expected: { key_attr: "Default Attr" }
 			},
 			{
-				name: "from {#if} (no else-if)",
-				source: "{#if t('key1')}{/if}",
-				expected: "(t('key1'))"
+				name: "from a mustache tag (t)",
+				source: `<div>{t('key_text', 'Text')}</div>`,
+				expected: { key_text: "Text" }
 			},
 			{
-				name: "from {#if} (with else-if)",
-				source: "{#if t('key1')}{:else if t('key2')}{/if}",
-				expected: "(t('key1'))\n;(t('key2'))"
-			},
-			{
-				name: "from {#each}",
-				source: "{#each t('key1')}{/each}",
-				expected: "(t('key1'))"
-			},
-			{
-				name: "from {#key}",
-				source: "{#key t('key1')}{/key}",
-				expected: "(t('key1'))"
-			},
-			{
-				name: "from {#await}",
-				source: "{#await t('key1')}{/await}",
-				expected: "(t('key1'))"
-			},
-			{
-				name: "from {#snippet}",
-				source: "{#snippet foo(arg=t('key1'))}{/snippet}",
-				expected: "((arg=t('key1'));)"
+				name: "from a mustache tag (i18next.t)",
+				source: `<div>{i18next.t('key_member', 'Member')}</div>`,
+				expected: { key_member: "Member" }
 			},
 			{
 				// https://github.com/dreamscached/i18next-cli-plugin-svelte/issues/14
-				name: "from {#snippet}",
+				name: "from {@html}",
+				source: `<div>{@html getHtmlWithTrans(t('key_html_tag', 'Html Tag'))}</div>`,
+				expected: { key_html_tag: "Html Tag" }
+			},
+			{
+				name: "from {@render}",
+				source: `{@render snippetWithTrans(t('key_render', 'Render'))}`,
+				expected: { key_render: "Render" }
+			},
+			{
+				name: "from {@attach}",
+				source: `<div {@attach fnWithTrans(t('key_attach', 'Attach'))}></div>`,
+				expected: { key_attach: "Attach" }
+			},
+			{
+				name: "from {@const}",
+				source: `{#if true}{@const c = t('key_const', 'Const')}{c}{/if}`,
+				expected: { key_const: "Const" }
+			},
+			{
+				name: "from {#if}",
+				source: `{#if t('key_if', 'If')}{/if}`,
+				expected: { key_if: "If" }
+			},
+			{
+				name: "from {#if} else-if branch",
+				source: `{#if cond}{:else if t('key_elseif', 'ElseIf')}{/if}`,
+				expected: { key_elseif: "ElseIf" }
+			},
+			{
+				name: "from {#each}",
+				source: `{#each [t('key_each', 'Each')] as item}{item}{/each}`,
+				expected: { key_each: "Each" }
+			},
+			{
+				name: "from {#key}",
+				source: `{#key t('key_key', 'Key')}{/key}`,
+				expected: { key_key: "Key" }
+			},
+			{
+				name: "from {#await}",
+				source: `{#await t('key_await', 'Await')}{/await}`,
+				expected: { key_await: "Await" }
+			},
+			{
+				name: "from a {#snippet} parameter default",
+				source: `{#snippet foo(arg = t('key_snippet_param', 'Snippet Param'))}{/snippet}`,
+				expected: { key_snippet_param: "Snippet Param" }
+			},
+			{
+				// https://github.com/dreamscached/i18next-cli-plugin-svelte/issues/14
+				name: "from a {#snippet} body",
+				source: `{#snippet foo()}{t('key_snippet_body', 'Snippet Body')}{/snippet}`,
+				expected: { key_snippet_body: "Snippet Body" }
+			},
+			{
+				// https://github.com/dreamscached/i18next-cli-plugin-svelte/issues/10
+				name: "from typescript with an interface",
 				source: `
-					{#snippet hello(variable)}
-						{variable}
-					{/snippet}
-				`,
-				expected: "(variable)"
-			}
-		])("$name", ({ source, expected }) => {
-			const plugin = new I18nextSveltePlugin();
-			const extracted = plugin.onLoad!(source, "test.svelte");
-			expect(extracted).toEqual(expected);
-		});
-	});
+					<script lang="ts">
+						import { getTranslationContext } from './translation-context';
 
-	describe("should skip non-svelte files", () => {
-		it.each([
-			{
-				path: "test.svelte",
-				source: "<script>console.log('test')</script>",
-				expected: "console.log('test')"
-			},
-			{
-				path: "test.ts",
-				source: "<foobar> invalid svelte/ts code",
-				expected: undefined
-			},
-			{
-				path: "test.svelte.ts",
-				source: "<foobar> invalid svelte/ts code",
-				expected: undefined
-			},
-			{
-				path: "svelte.ts",
-				source: "<foobar> invalid svelte/ts code",
-				expected: undefined
+						interface Props {
+							id: string;
+						}
+
+						const { t } = $derived.by(getTranslationContext('translation'));
+						const { id }: Props = $props();
+					</script>
+					<div {id}>{t('key_ts', 'Hello TS')}</div>
+				`,
+				expected: { key_ts: "Hello TS" }
 			}
-		])("$path", ({ path, source, expected }) => {
-			const plugin = new I18nextSveltePlugin();
-			const extracted = plugin.onLoad!(source, path);
-			expect(extracted).toEqual(expected);
+		])("extracts keys $name", async ({ source, expected }) => {
+			await writeFile(join(tempDir, "src/App.svelte"), source);
+			const results = await extract(makeConfig());
+			const file = results.find((r) => pathEndsWith(r.path, "/en/translation.json"));
+			expect(file).toBeDefined();
+			expect(file!.newTranslations).toEqual(expected);
 		});
 	});
 
@@ -398,9 +367,7 @@ const data = [1, 2, 3]
 					</div>
 				`,
 				configOverrides: {
-					useTranslationNames: [
-						"getTranslationContext"
-					]
+					useTranslationNames: ["getTranslationContext"]
 				},
 				expectedNamespace: "/en/my-namespace.json",
 				expectedTranslations: {
@@ -417,9 +384,7 @@ const data = [1, 2, 3]
 					};
 				`,
 				configOverrides: {
-					useTranslationNames: [
-						"getTranslationContext"
-					]
+					useTranslationNames: ["getTranslationContext"]
 				},
 				expectedNamespace: "/en/my-namespace.json",
 				expectedTranslations: {
@@ -461,98 +426,5 @@ const data = [1, 2, 3]
 				}
 			}
 		);
-	});
-
-	describe("should extract translation keys from svelte components", () => {
-		let tempDir: string;
-
-		function pathEndsWith(p: string | undefined, suffix: string): boolean {
-			if (!p) return false;
-			return p.replace(/\\/g, "/").endsWith(suffix);
-		}
-
-		beforeEach(async () => {
-			tempDir = await mkdtemp(join(tmpdir(), "i18next-svelte-key-extract-"));
-			await mkdir(join(tempDir, "src"), { recursive: true });
-		});
-
-		afterEach(async () => {
-			await rm(tempDir, { recursive: true, force: true });
-		});
-
-		function makeConfig(): I18nextToolkitConfig {
-			return {
-				locales: ["en"],
-				extract: {
-					input: [join(tempDir, "src/**/*.svelte")],
-					output: join(tempDir, "locales/{{language}}/{{namespace}}.json"),
-					functions: ["t", "i18next.t"],
-					defaultNS: "translation",
-					useTranslationNames: ["useTranslation", "getTranslationContext"]
-				},
-				plugins: [new I18nextSveltePlugin()]
-			};
-		}
-
-		it.each([
-			{
-				name: "extracts simple keys from script and html",
-				source: `
-                    <script>
-						import { t } from "i18next";
-                        const val = t('key_script', 'Default Script');
-                    </script>
-                    <div>{t('key_html', 'Default HTML')}</div>
-                `,
-				path: "/en/translation.json",
-				expected: {
-					key_script: "Default Script",
-					key_html: "Default HTML"
-				}
-			},
-			{
-				name: "extracts keys from attributes",
-				source: `
-                    <script>
-						import { t } from "i18next";
-                    </script>
-					<button title={t('key_attr', 'Default Attr')}>
-					</button>
-				`,
-				path: "/en/translation.json",
-				expected: {
-					key_attr: "Default Attr"
-				}
-			},
-			{
-				// https://github.com/dreamscached/i18next-cli-plugin-svelte/issues/10
-				name: "handles typescript with interface",
-				source: `
-					<script lang="ts">
-						import { getTranslationContext } from './translation-context';
-
-						interface Props {
-							id: string;
-						}
-
-						const { t } = $derived.by(getTranslationContext('ui-form'));
-						const { id }: Props = $props();
-					</script>
-					<div {id}>
-						{t('hello-world', "Hello World!")}
-					</div>
-				`,
-				path: "/en/ui-form.json",
-				expected: {
-					"hello-world": "Hello World!"
-				}
-			}
-		])("$name", async ({ source, expected, path }) => {
-			await writeFile(join(tempDir, "src/App.svelte"), source);
-			const results = await extract(makeConfig());
-			const defaultFile = results.find((r) => pathEndsWith(r.path, path));
-			expect(defaultFile).toBeDefined();
-			expect(defaultFile!.newTranslations).toEqual(expected);
-		});
 	});
 });

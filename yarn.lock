@@ -1487,6 +1487,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"ast-types@npm:^0.16.1":
+  version: 0.16.1
+  resolution: "ast-types@npm:0.16.1"
+  dependencies:
+    tslib: "npm:^2.0.1"
+  checksum: 10c0/abcc49e42eb921a7ebc013d5bec1154651fb6dbc3f497541d488859e681256901b2990b954d530ba0da4d0851271d484f7057d5eff5e07cb73e8b10909f711bf
+  languageName: node
+  linkType: hard
+
 "ast-v8-to-istanbul@npm:^1.0.0":
   version: 1.0.0
   resolution: "ast-v8-to-istanbul@npm:1.0.0"
@@ -1854,6 +1863,16 @@ __metadata:
   languageName: node
   linkType: hard
 
+"esprima@npm:~4.0.0":
+  version: 4.0.1
+  resolution: "esprima@npm:4.0.1"
+  bin:
+    esparse: ./bin/esparse.js
+    esvalidate: ./bin/esvalidate.js
+  checksum: 10c0/ad4bab9ead0808cf56501750fd9d3fb276f6b105f987707d059005d57e182d18a7c9ec7f3a01794ebddcca676773e42ca48a32d67a250c9d35e009ca613caba3
+  languageName: node
+  linkType: hard
+
 "esquery@npm:^1.7.0":
   version: 1.7.0
   resolution: "esquery@npm:1.7.0"
@@ -2203,6 +2222,7 @@ __metadata:
   dependencies:
     "@eslint/js": "npm:^10.0.1"
     "@trivago/prettier-plugin-sort-imports": "npm:^6.0.2"
+    "@types/estree": "npm:^1.0.8"
     "@types/node": "npm:^25.6.0"
     "@vitest/coverage-v8": "npm:4.1.5"
     eslint: "npm:^10.2.1"
@@ -2210,6 +2230,7 @@ __metadata:
     i18next: "npm:^26.0.6"
     i18next-cli: "npm:^1.56.3"
     prettier: "npm:^3.8.3"
+    recast: "npm:^0.23.11"
     svelte: "npm:^5.55.4"
     typescript: "npm:^5.9.3"
     typescript-eslint: "npm:^8.59.0"
@@ -3236,6 +3257,19 @@ __metadata:
   languageName: node
   linkType: hard
 
+"recast@npm:^0.23.11":
+  version: 0.23.11
+  resolution: "recast@npm:0.23.11"
+  dependencies:
+    ast-types: "npm:^0.16.1"
+    esprima: "npm:~4.0.0"
+    source-map: "npm:~0.6.1"
+    tiny-invariant: "npm:^1.3.3"
+    tslib: "npm:^2.0.1"
+  checksum: 10c0/45b520a8f0868a5a24ecde495be9de3c48e69a54295d82a7331106554b75cfba75d16c909959d056e9ceed47a1be5e061e2db8b9ecbcd6ba44c2f3ef9a47bd18
+  languageName: node
+  linkType: hard
+
 "restore-cursor@npm:^5.0.0":
   version: 5.1.0
   resolution: "restore-cursor@npm:5.1.0"
@@ -3417,6 +3451,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"source-map@npm:~0.6.1":
+  version: 0.6.1
+  resolution: "source-map@npm:0.6.1"
+  checksum: 10c0/ab55398007c5e5532957cb0beee2368529618ac0ab372d789806f5718123cc4367d57de3904b4e6a4170eb5a0b0f41373066d02ca0735a0c4d75c7d328d3e011
+  languageName: node
+  linkType: hard
+
 "ssri@npm:^12.0.0":
   version: 12.0.0
   resolution: "ssri@npm:12.0.0"
@@ -3550,6 +3591,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"tiny-invariant@npm:^1.3.3":
+  version: 1.3.3
+  resolution: "tiny-invariant@npm:1.3.3"
+  checksum: 10c0/65af4a07324b591a059b35269cd696aba21bef2107f29b9f5894d83cc143159a204b299553435b03874ebb5b94d019afa8b8eff241c8a4cfee95872c2e1c1c4a
+  languageName: node
+  linkType: hard
+
 "tinybench@npm:^2.9.0":
   version: 2.9.0
   resolution: "tinybench@npm:2.9.0"
@@ -3590,7 +3638,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"tslib@npm:^2.1.0, tslib@npm:^2.4.0":
+"tslib@npm:^2.0.1, tslib@npm:^2.1.0, tslib@npm:^2.4.0":
   version: 2.8.1
   resolution: "tslib@npm:2.8.1"
   checksum: 10c0/9c4759110a19c53f992d9aae23aac5ced636e99887b51b9e61def52611732872ff7668757d4e4c61f19691e36f4da981cd9485e869b4a7408d689f6bf1f14e62
