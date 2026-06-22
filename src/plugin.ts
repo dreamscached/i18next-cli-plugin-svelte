@@ -1,7 +1,24 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { walk } from "estree-walker";
+import type { CallExpression, Expression, VariableDeclarator } from "@swc/types";
+import type * as estree from "estree";
 import type { Plugin, PluginContext } from "i18next-cli";
+import * as recast from "recast";
 import { parse, type AST } from "svelte/compiler";
+
+import { extractScriptStatements, extractTemplateStatements, toIIFE } from "./ast.js";
+
+/**
+ * The node type passed to {@link Plugin.onVisitNode}. i18next-cli walks an
+ * `@swc/core` AST; deriving the type from the plugin interface keeps our public
+ * surface in sync with it without pinning a specific `@swc` version here.
+ */
+type VisitorNode = Parameters<NonNullable<Plugin["onVisitNode"]>>[0];
+
+/**
+ * Svelte's `parse()` returns the *legacy* AST, whose root exposes `html` (a
+ * fragment with `children`) instead of the modern `fragment`/`nodes`. Svelte 5
+ * only ships types for the modern AST, so we describe the legacy bits we use.
+ */
+type LegacyRoot = AST.Root & { html: AST.Fragment & { children: unknown[] } };
 
 /**
  * Enables I18next to extract translation keys from .svelte component files.
@@ -23,64 +40,31 @@ export class I18nextPluginSvelte implements Plugin {
 		// Passthrough for non-Svelte files
 		if (!path.match(/\.svelte$/)) return undefined;
 
-		const fromSvelteAst = (node: any) => code.slice(node.content.start, node.content.end);
-		const fromEstreeAst = (node: any) => {
-			switch (node.type) {
-				case "MustacheTag": // these have .expression
-				case "RawMustacheTag":
-				case "HtmlTag":
-				case "RenderTag":
-				case "AttachTag":
-				case "ConstTag":
-				case "IfBlock":
-				case "EachBlock":
-				case "KeyBlock":
-				case "AwaitBlock":
-					return `(${code.slice(node.expression.start, node.expression.end)})`;
-				case "SnippetBlock": // needs js-like tree handling
-					{
-						const js = fromNestedJs(node.parameters ?? []);
-						if (!js.length) return undefined;
-						return `(${js})`;
-					}
-				default:
-					return undefined;
-			}
+		const ast = parse(code, { filename: path }) as unknown as LegacyRoot;
+
+		// Reassemble everything into a single async IIFE. Sharing one lexical
+		// scope mirrors how Svelte runs a component (the template and instance
+		// can see module-level declarations), which lets the extractor resolve
+		// scoped namespaces/keyPrefixes declared in <script> from usages in the
+		// template. The async wrapper also makes top-level `await import(...)`
+		// (rewritten from `import` statements) legal.
+		const body: estree.Statement[] = [];
+
+		// Order matters: declarations must precede the template usages that
+		// reference them. Module scope encloses instance scope encloses template.
+		if (ast.module) body.push(...extractScriptStatements(ast.module));
+		if (ast.instance) body.push(...extractScriptStatements(ast.instance));
+
+		// extract from HTML (mustache tags, svelte blocks, attribute exprs, snippets)
+		if (ast.html.children.length) body.push(...extractTemplateStatements(ast.html));
+
+		const program: estree.Program = {
+			type: "Program",
+			sourceType: "module",
+			body: [toIIFE(body)]
 		};
 
-		const fromNestedJs = (root: any) => {
-			const strings: string[] = [];
-			walk(root, {
-				enter(node: any) {
-					switch (node.type) {
-						case "AssignmentPattern":
-							strings.push(`(${code.slice(node.start, node.end)});`);
-							break;
-					}
-				}
-			});
-			return strings.join("\n;");
-		};
-
-		const ast = parse(code, { filename: path }) as AST.Root & { html: any };
-		const extracted: string[] = [];
-
-		// extract from the <script> tag
-		if (ast.instance) extracted.push(fromSvelteAst(ast.instance));
-		if (ast.module) extracted.push(fromSvelteAst(ast.module));
-
-		// extract from HTML
-		if (ast.html?.children?.length != 0) {
-			walk(ast.html, {
-				enter(node) {
-					const stmt = fromEstreeAst(node);
-					if (stmt) extracted.push(stmt);
-				}
-			});
-		}
-
-		// When contatenating make sure we don't cause issues with ASI
-		return extracted.join("\n;");
+		return recast.print(program).code;
 	}
 
 	/**
@@ -91,41 +75,22 @@ export class I18nextPluginSvelte implements Plugin {
 	 * @see https://github.com/dreamscached/i18next-cli-plugin-svelte/issues/5
 	 * @see https://github.com/i18next/i18next-cli/issues/231
 	 */
-	onVisitNode(node: any, context: PluginContext): void {
-		switch (node.type) {
-			case "VariableDeclarator":
-				this.handleDerivedBy(node, context);
-				break;
+	onVisitNode(node: VisitorNode, context: PluginContext): void {
+		if (node.type === "VariableDeclarator") {
+			this.handleDerivedBy(node as VariableDeclarator, context);
 		}
 	}
 
-	private handleDerivedBy(node: any, context: PluginContext) {
+	private handleDerivedBy(node: VariableDeclarator, context: PluginContext): void {
 		const init = node.init;
 		if (!init || init.type !== "CallExpression") return;
 
-		// Detect $derived.by(<inner>) or $derived(<inner>)
-		const callee = init.callee;
-		let innerCall: any;
-		if (
-			callee.type === "MemberExpression" &&
-			callee.object.type === "Identifier" &&
-			callee.object.value === "$derived" &&
-			callee.property.type === "Identifier" &&
-			callee.property.value === "by"
-		) {
-			const firstArg = init.arguments?.[0]?.expression;
-			if (firstArg?.type === "CallExpression") innerCall = firstArg;
-		} else if (callee.type === "Identifier" && callee.value === "$derived") {
-			const firstArg = init.arguments?.[0]?.expression;
-			if (firstArg?.type === "CallExpression") innerCall = firstArg;
-		}
+		const innerCall = unwrapDerived(init);
+		if (!innerCall || innerCall.callee.type !== "Identifier") return;
 
-		if (!innerCall || innerCall.callee?.type !== "Identifier") return;
-
-		const hookName: string = innerCall.callee.value;
+		const hookName = innerCall.callee.value;
 
 		// Check if the inner call matches a registered useTranslationNames entry
-		// prettier-ignore
 		const useTranslationNames = context.config.extract.useTranslationNames;
 		if (!useTranslationNames) return;
 
@@ -148,32 +113,12 @@ export class I18nextPluginSvelte implements Plugin {
 
 		if (!matched) return;
 
-		const getDefaultNsNode = (node: any) => {
-			switch (node?.type) {
-				case "StringLiteral":
-					return node.value;
-				case "ArrayExpression":
-					return (() => {
-						const expressions = node.elements.map((it: any) => it.expression);
-						// prettier-ignore
-						const isStringArray = expressions.every((it: any) => it.type === "StringLiteral");
-						if (!isStringArray) return undefined;
-						return expressions[0]?.value ?? undefined;
-					})();
-				default:
-					return undefined;
-			}
-		};
-
 		// Extract namespace and keyPrefix from the inner call's arguments
-		const nsNode =
-			nsArgIndex !== -1 ? innerCall.arguments?.[nsArgIndex]?.expression : undefined;
-		const kpNode =
-			kpArgIndex !== -1 ? innerCall.arguments?.[kpArgIndex]?.expression : undefined;
+		const nsNode = nsArgIndex !== -1 ? innerCall.arguments[nsArgIndex]?.expression : undefined;
+		const kpNode = kpArgIndex !== -1 ? innerCall.arguments[kpArgIndex]?.expression : undefined;
 
-		const defaultNs: string | undefined = getDefaultNsNode(nsNode);
-		const keyPrefix: string | undefined =
-			kpNode?.type === "StringLiteral" ? kpNode.value : undefined;
+		const defaultNs = resolveNamespace(nsNode);
+		const keyPrefix = kpNode?.type === "StringLiteral" ? kpNode.value : undefined;
 
 		if (!defaultNs && !keyPrefix) return;
 
@@ -187,10 +132,12 @@ export class I18nextPluginSvelte implements Plugin {
 		// Register destructured variables in scope
 		if (node.id.type === "ObjectPattern") {
 			for (const prop of node.id.properties) {
-				if (prop.type === "AssignmentPatternProperty" && prop.key.type === "Identifier") {
+				if (prop.type === "AssignmentPatternProperty") {
 					context.setVarInScope(prop.key.value, scopeInfo);
-				}
-				if (prop.type === "KeyValuePatternProperty" && prop.value.type === "Identifier") {
+				} else if (
+					prop.type === "KeyValuePatternProperty" &&
+					prop.value.type === "Identifier"
+				) {
 					context.setVarInScope(prop.value.value, scopeInfo);
 				}
 			}
@@ -199,4 +146,42 @@ export class I18nextPluginSvelte implements Plugin {
 			context.setVarInScope(node.id.value, scopeInfo);
 		}
 	}
+}
+
+/**
+ * Unwraps a `$derived(<inner>)` or `$derived.by(<inner>)` call, returning the
+ * inner call expression (e.g. `useTranslation(...)`) when present.
+ */
+function unwrapDerived(init: CallExpression): CallExpression | undefined {
+	const callee = init.callee;
+
+	const isDerived =
+		(callee.type === "Identifier" && callee.value === "$derived") ||
+		(callee.type === "MemberExpression" &&
+			callee.object.type === "Identifier" &&
+			callee.object.value === "$derived" &&
+			callee.property.type === "Identifier" &&
+			callee.property.value === "by");
+
+	if (!isDerived) return undefined;
+
+	const firstArg = init.arguments[0]?.expression;
+	return firstArg?.type === "CallExpression" ? firstArg : undefined;
+}
+
+/**
+ * Resolves a namespace argument to its string value. Accepts a plain string
+ * literal or an array of string literals (fallback namespaces), in which case
+ * the first entry wins.
+ *
+ * @see https://github.com/dreamscached/i18next-cli-plugin-svelte/issues/15
+ */
+function resolveNamespace(node: Expression | undefined): string | undefined {
+	if (node?.type === "StringLiteral") return node.value;
+	if (node?.type !== "ArrayExpression") return undefined;
+
+	const elements = node.elements.map((it) => it?.expression);
+	const first = elements[0];
+	const allStrings = elements.every((it) => it?.type === "StringLiteral");
+	return allStrings && first?.type === "StringLiteral" ? first.value : undefined;
 }
