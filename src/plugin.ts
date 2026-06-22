@@ -134,7 +134,10 @@ export class I18nextPluginSvelte implements Plugin {
 			for (const prop of node.id.properties) {
 				if (prop.type === "AssignmentPatternProperty") {
 					context.setVarInScope(prop.key.value, scopeInfo);
-				} else if (prop.type === "KeyValuePatternProperty" && prop.value.type === "Identifier") {
+				} else if (
+					prop.type === "KeyValuePatternProperty" &&
+					prop.value.type === "Identifier"
+				) {
 					context.setVarInScope(prop.value.value, scopeInfo);
 				}
 			}

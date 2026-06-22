@@ -161,36 +161,36 @@ describe("extractScriptIIFE", () => {
 		expect(js).toEqual(output);
 	});
 
-    it.each([
-        {
-            source: `
+	it.each([
+		{
+			source: `
                 {#snippet foobar()}
                 {/snippet}
             `,
-            output: `(async () => {
+			output: `(async () => {
     (async () => {})();
 })();`
-        },
-        {
-            source: `
+		},
+		{
+			source: `
                 {#snippet foobar(x, y=42, z=fn("bar"))}
                 {/snippet}
             `,
-            output: `(async () => {
+			output: `(async () => {
     (async () => {
         fn("bar");
     })();
 })();`
-        },
-        {
-            source: `
+		},
+		{
+			source: `
                 {#snippet foobar(x, y=42, z=fn("bar"))}{/snippet}
                 {#snippet barbaz(x, y, z)}
                     <div my-attr={fn("bar")}>
                     </div>
                 {/snippet}
             `,
-            output: `(async () => {
+			output: `(async () => {
     (async () => {
         fn("bar");
     })();
@@ -199,11 +199,11 @@ describe("extractScriptIIFE", () => {
         fn("bar");
     })();
 })();`
-        }
-    ])("should convert snippet to iife", ({ source, output }) => {
-        const ast = parse(source) as AST.Root & { html: AST.Fragment };
+		}
+	])("should convert snippet to iife", ({ source, output }) => {
+		const ast = parse(source) as AST.Root & { html: AST.Fragment };
 		const iife = extractTemplateIIFE(ast.html);
 		const js = recast.print(iife).code;
 		expect(js).toEqual(output);
-    });
+	});
 });
