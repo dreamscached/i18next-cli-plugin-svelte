@@ -27,7 +27,10 @@ describe("I18nextSveltePlugin", () => {
 		it.each([
 			{ name: "an example component", source: "<script>console.log('test')</script>" },
 			{ name: "an empty file", source: "" },
-			{ name: "a file with no <script> tag", source: "<div>foobar</div><style>div{}</style>" },
+			{
+				name: "a file with no <script> tag",
+				source: "<div>foobar</div><style>div{}</style>"
+			},
 			{ name: "an empty <script> tag", source: "<script></script>" },
 			{ name: "an empty <script module> tag", source: "<script module></script>" },
 			{

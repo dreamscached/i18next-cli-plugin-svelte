@@ -2221,6 +2221,7 @@ __metadata:
   resolution: "i18next-cli-plugin-svelte@workspace:."
   dependencies:
     "@eslint/js": "npm:^10.0.1"
+    "@swc/types": "npm:^0.1.25"
     "@trivago/prettier-plugin-sort-imports": "npm:^6.0.2"
     "@types/estree": "npm:^1.0.8"
     "@types/node": "npm:^25.6.0"
