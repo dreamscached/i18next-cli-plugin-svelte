@@ -6,5 +6,12 @@ import tsEslint from "typescript-eslint";
 export default defineConfig([
 	{ ignores: [".yarn/*", "dist/*"] },
 	eslint.configs.recommended,
-	...tsEslint.configs.recommended
+	...tsEslint.configs.recommended,
+	{
+		// Plain Node scripts (e.g. the coverage badge generator)
+		files: ["scripts/**/*.{js,mjs}"],
+		languageOptions: {
+			globals: { console: "readonly", process: "readonly" }
+		}
+	}
 ]);

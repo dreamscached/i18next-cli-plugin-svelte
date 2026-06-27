@@ -1,6 +1,7 @@
 # [i18next-cli](https://github.com/i18next/i18next-cli) Svelte plugin
 
 [![GitHub branch check runs](https://img.shields.io/github/check-runs/dreamscached/i18next-cli-plugin-svelte/master)](https://github.com/dreamscached/i18next-cli-plugin-svelte/actions/workflows/checks.yml)
+[![Coverage](https://raw.githubusercontent.com/dreamscached/i18next-cli-plugin-svelte/docs/.github/badges/coverage.svg)](https://github.com/dreamscached/i18next-cli-plugin-svelte/actions/workflows/coverage-badge.yml)
 [![NPM Downloads](https://img.shields.io/npm/dm/i18next-cli-plugin-svelte)](https://www.npmjs.com/package/i18next-cli-plugin-svelte)
 [![GitHub License](https://img.shields.io/github/license/dreamscached/i18next-cli-plugin-svelte)](https://github.com/dreamscached/i18next-cli-plugin-svelte/blob/master/LICENSE)
 
