@@ -195,6 +195,27 @@ describe("I18nextSveltePlugin", () => {
 					<div {id}>{t('key_ts', 'Hello TS')}</div>
 				`,
 				expected: { key_ts: "Hello TS" }
+			},
+			{
+				// recast drops the parens around TS casts when reprinting, turning
+				// (x as T).y into the invalid x as T.y. Without stripping the casts
+				// i18next-cli fails to parse the emitted source and skips the file.
+				name: "from a component with parenthesized TS casts (script and template)",
+				source: `
+					<script lang="ts">
+						function f(e: Event) {
+							const file = (e.target as HTMLInputElement).files?.[0];
+							const size = ($state.snapshot(file) as unknown as Blob).size;
+							t('cast_script', 'Script');
+						}
+					</script>
+					{(e.target as HTMLInputElement).value ? t('cast_yes', 'Yes') : t('cast_no', 'No')}
+				`,
+				expected: {
+					cast_script: "Script",
+					cast_yes: "Yes",
+					cast_no: "No"
+				}
 			}
 		])("extracts keys $name", async ({ source, expected }) => {
 			await writeFile(join(tempDir, "src/App.svelte"), source);

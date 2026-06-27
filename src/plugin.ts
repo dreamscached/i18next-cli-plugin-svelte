@@ -4,7 +4,12 @@ import type { Plugin, PluginContext } from "i18next-cli";
 import * as recast from "recast";
 import { parse, type AST } from "svelte/compiler";
 
-import { extractScriptStatements, extractTemplateStatements, toIIFE } from "./ast.js";
+import {
+	extractScriptStatements,
+	extractTemplateStatements,
+	stripTypeCasts,
+	toIIFE
+} from "./ast.js";
 
 /**
  * The node type passed to {@link Plugin.onVisitNode}. i18next-cli walks an
@@ -63,6 +68,11 @@ export class I18nextPluginSvelte implements Plugin {
 			sourceType: "module",
 			body: [toIIFE(body)]
 		};
+
+		// Drop TS expression wrappers before printing; recast mangles the parens
+		// around them (e.g. (x as T).y -> x as T.y), which would make the emitted
+		// source unparsable and cause i18next-cli to skip the whole file.
+		stripTypeCasts(program);
 
 		return recast.print(program).code;
 	}
