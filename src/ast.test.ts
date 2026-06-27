@@ -1,8 +1,13 @@
+import type * as estree from "estree";
 import * as recast from "recast";
 import { parse, type AST } from "svelte/compiler";
 import { describe, expect, it } from "vitest";
 
-import { extractScriptIIFE, extractTemplateExpr as extractTemplateIIFE } from "./ast.js";
+import {
+	extractScriptIIFE,
+	extractTemplateExpr as extractTemplateIIFE,
+	stripTypeCasts
+} from "./ast.js";
 
 describe("extractScriptIIFE", () => {
 	it.each([
@@ -265,5 +270,45 @@ describe("extractScriptIIFE", () => {
 		const iife = extractTemplateIIFE(ast.html);
 		const js = recast.print(iife).code;
 		expect(js).toEqual(output);
+	});
+});
+
+describe("stripTypeCasts", () => {
+	it.each([
+		{
+			name: "a cast used as a member base",
+			source: `<script lang="ts">const a = (x as T).y;</script>`,
+			output: `const a = x.y;`
+		},
+		{
+			name: "nested casts",
+			source: `<script lang="ts">const a = (x as A as B).y;</script>`,
+			output: `const a = x.y;`
+		},
+		{
+			name: "a double 'as unknown as' cast",
+			source: `<script lang="ts">const a = (x as unknown as B).z;</script>`,
+			output: `const a = x.z;`
+		},
+		{
+			name: "a cast used as a call callee",
+			source: `<script lang="ts">const a = (fn as F)();</script>`,
+			output: `const a = fn();`
+		},
+		{
+			name: "a non-null assertion",
+			source: `<script lang="ts">const a = (w!).q;</script>`,
+			output: `const a = w.q;`
+		},
+		{
+			name: "a bare cast (already valid, left equivalent)",
+			source: `<script lang="ts">const a = z as T;</script>`,
+			output: `const a = z;`
+		}
+	])("unwraps $name", ({ source, output }) => {
+		const ast = parse(source) as AST.Root;
+		const program = ast.instance!.content as unknown as estree.Program;
+		stripTypeCasts(program);
+		expect(recast.print(program).code).toEqual(output);
 	});
 });
