@@ -195,6 +195,27 @@ describe("I18nextSveltePlugin", () => {
 					<div {id}>{t('key_ts', 'Hello TS')}</div>
 				`,
 				expected: { key_ts: "Hello TS" }
+			},
+			{
+				// recast drops the parens around TS casts when reprinting, turning
+				// (x as T).y into the invalid x as T.y. Without stripping the casts
+				// i18next-cli fails to parse the emitted source and skips the file.
+				name: "from a component with parenthesized TS casts (script and template)",
+				source: `
+					<script lang="ts">
+						function f(e: Event) {
+							const file = (e.target as HTMLInputElement).files?.[0];
+							const size = ($state.snapshot(file) as unknown as Blob).size;
+							t('cast_script', 'Script');
+						}
+					</script>
+					{(e.target as HTMLInputElement).value ? t('cast_yes', 'Yes') : t('cast_no', 'No')}
+				`,
+				expected: {
+					cast_script: "Script",
+					cast_yes: "Yes",
+					cast_no: "No"
+				}
 			}
 		])("extracts keys $name", async ({ source, expected }) => {
 			await writeFile(join(tempDir, "src/App.svelte"), source);
@@ -393,22 +414,114 @@ describe("I18nextSveltePlugin", () => {
 				expectedTranslations: {
 					"hello-world": "Hello World!"
 				}
+			},
+			{
+				name: "handles non-destructured assignment: const i18n = ...",
+				filename: "src/App.svelte",
+				source: `
+					<script>
+						const i18n = $derived.by(getTranslationContext('my-namespace'));
+					</script>
+					<div>{i18n.t('hello-world', 'Hello World')}</div>
+				`,
+				expectedNamespace: "/en/my-namespace.json",
+				expectedTranslations: {
+					"hello-world": "Hello World"
+				}
+			},
+			{
+				name: "ignores a non-literal namespace argument (falls back to default)",
+				filename: "src/App.svelte",
+				source: `
+					<script>
+						const dynamicNs = 'runtime-only';
+						const { t } = $derived.by(getTranslationContext(dynamicNs));
+					</script>
+					<div>{t('hello-world', 'Hello World')}</div>
+				`,
+				expectedNamespace: "/en/translation.json",
+				expectedTranslations: {
+					"hello-world": "Hello World"
+				}
+			},
+			{
+				name: "ignores a namespace array containing non-literals",
+				filename: "src/App.svelte",
+				source: `
+					<script>
+						const dynamicNs = 'runtime-only';
+						const { t } = $derived.by(getTranslationContext([dynamicNs, 'fallback']));
+					</script>
+					<div>{t('hello-world', 'Hello World')}</div>
+				`,
+				expectedNamespace: "/en/translation.json",
+				expectedTranslations: {
+					"hello-world": "Hello World"
+				}
+			},
+			{
+				name: "ignores $derived.by wrapping a non-call expression",
+				filename: "src/App.svelte",
+				source: `
+					<script>
+						const ctx = {};
+						const { t } = $derived.by(ctx);
+					</script>
+					<div>{t('hello-world', 'Hello World')}</div>
+				`,
+				expectedNamespace: "/en/translation.json",
+				expectedTranslations: {
+					"hello-world": "Hello World"
+				}
+			},
+			{
+				name: "resolves namespace when keyPrefix arg is disabled (-1)",
+				filename: "src/App.svelte",
+				source: `
+					<script>
+						const { t } = $derived.by(useCustomHook('my-namespace'));
+					</script>
+					<div>{t('hello-world', 'Hello World')}</div>
+				`,
+				configOverrides: {
+					useTranslationNames: [{ name: "useCustomHook", nsArg: 0, keyPrefixArg: -1 }]
+				},
+				expectedNamespace: "/en/my-namespace.json",
+				expectedTranslations: {
+					"hello-world": "Hello World"
+				}
+			},
+			{
+				name: "applies default arg positions for an object hook config",
+				filename: "src/App.svelte",
+				source: `
+					<script>
+						const { t } = $derived.by(getTranslationContext('my-namespace'));
+					</script>
+					<div>{t('hello-world', 'Hello World')}</div>
+				`,
+				configOverrides: {
+					useTranslationNames: [{ name: "getTranslationContext" }]
+				},
+				expectedNamespace: "/en/my-namespace.json",
+				expectedTranslations: {
+					"hello-world": "Hello World"
+				}
+			},
+			{
+				name: "registers t while skipping a rest element in the pattern",
+				filename: "src/App.svelte",
+				source: `
+					<script>
+						const { t, ...rest } = $derived.by(getTranslationContext('my-namespace'));
+					</script>
+					<div>{t('hello-world', 'Hello World')}</div>
+				`,
+				expectedNamespace: "/en/my-namespace.json",
+				expectedTranslations: {
+					"hello-world": "Hello World"
+				}
 			}
-			// FIXME: this should work, but it doesn't; this is bad!
-			// {
-			// 	name: "handles non-destructured assignment: const i18n = ...",
-			// 	filename: "src/App.svelte",
-			// 	source: `
-			// 		<script>
-			// 			const i18n = $derived.by(getTranslationContext('my-namespace'));
-			// 		</script>
-			// 		<div>{i18n.t('hello-world', 'Hello World')}</div>
-			// 	`,
-			// 	expectedNamespace: "/en/my-namespace.json",
-			// 	expectedTranslations: {
-			// 		"hello-world": "Hello World"
-			// 	}
-			// }
 		])(
 			"$name",
 			async ({

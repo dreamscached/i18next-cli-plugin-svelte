@@ -94,6 +94,41 @@ export function extractTemplateStatements(fragment: AST.Fragment): estree.Expres
 	return statements;
 }
 
+/**
+ * TypeScript-only expression wrappers that wrap an inner `.expression`. recast
+ * can reprint these without the parentheses they require, so a member/call base
+ * like `(x as T).y` becomes `x as T.y` - which parses as the qualified type
+ * `T.y` and is invalid, making i18next-cli skip the whole file.
+ *
+ * @see https://github.com/dreamscached/i18next-cli-plugin-svelte/issues
+ */
+const TS_EXPRESSION_WRAPPERS = new Set([
+	"TSAsExpression",
+	"TSSatisfiesExpression",
+	"TSNonNullExpression",
+	"TSTypeAssertion",
+	"TSInstantiation"
+]);
+
+/**
+ * Replaces TypeScript expression wrappers (casts, non-null assertions, etc.)
+ * with their inner expression so the reprinted source is free of the
+ * precedence/parenthesis hazards recast introduces around them. Extraction only
+ * needs the runtime expressions, so dropping the type wrappers is safe.
+ *
+ * Runs on `leave` (bottom-up) so nested wrappers like `(a as A as B).y`
+ * collapse fully to `a.y`.
+ */
+export function stripTypeCasts(node: estree.Node): void {
+	walk(node, {
+		leave(node) {
+			if (TS_EXPRESSION_WRAPPERS.has(node.type)) {
+				this.replace((node as unknown as { expression: estree.Expression }).expression);
+			}
+		}
+	});
+}
+
 export function extractScriptIIFE(script: AST.Script): estree.ExpressionStatement {
 	return toIIFE(extractScriptStatements(script));
 }

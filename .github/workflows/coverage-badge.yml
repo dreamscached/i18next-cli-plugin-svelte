@@ -1,0 +1,59 @@
+name: Update coverage badge
+
+on:
+  push:
+    branches: [master]
+
+# Allow the workflow to push the generated badge to the docs branch.
+permissions:
+  contents: write
+
+# Serialize runs so concurrent master pushes don't race on the force-push.
+concurrency:
+  group: coverage-badge
+  cancel-in-progress: true
+
+jobs:
+  coverage_badge:
+    name: Generate and publish coverage badge
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Install Node
+        uses: actions/setup-node@v5
+        with:
+          cache: yarn
+          node-version: "24.x"
+
+      - name: Install dependencies
+        run: yarn install --immutable
+
+      - name: Run tests with coverage
+        run: yarn vitest run --coverage --coverage.reporter=json-summary --coverage.reporter=text
+
+      - name: Generate coverage badge
+        run: |
+          node scripts/make-coverage-badge.mjs
+          cp .github/badges/coverage.svg "$RUNNER_TEMP/coverage.svg"
+
+      - name: Publish badge to docs branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # Rebase the docs branch onto the latest master and put the freshly
+          # generated badge on top as the single head commit.
+          git fetch origin master
+          git checkout -B docs origin/master
+
+          mkdir -p .github/badges
+          cp "$RUNNER_TEMP/coverage.svg" .github/badges/coverage.svg
+
+          # Force-add: .github/badges/ is gitignored so it never lands on master.
+          git add -f .github/badges/coverage.svg
+          git commit -m "Update coverage badge [skip ci]"
+          git push --force origin docs
