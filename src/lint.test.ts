@@ -166,6 +166,32 @@ describe("hardcoded string linting", () => {
 		expect(issues.map((i) => i.text)).toEqual(["Tip text"]);
 	});
 
+	it('lints text in every tag with acceptedTags: "all"', async () => {
+		const issues = await lint(`<div>Div text</div><custom-el>Custom text</custom-el>`, {
+			acceptedTags: "all"
+		});
+		expect(issues.map((i) => i.text)).toEqual(["Div text", "Custom text"]);
+	});
+
+	it("keeps default ignored attributes when acceptedAttributes is empty", async () => {
+		const issues = await lint(
+			`<button class="btn primary" id="main-id" type="button">Save it</button>`,
+			{ acceptedAttributes: [] }
+		);
+		expect(issues.map((i) => i.text)).toEqual(["Save it"]);
+	});
+
+	it("reports the source line of text that follows an entity", async () => {
+		const issues = await lint(`<p>
+&nbsp;
+Hello &amp; bye</p>
+<p title="&quot;Quoted&quot; text"></p>`);
+		expect(issues).toEqual([
+			{ text: "Hello & bye", line: 3, type: "hardcoded" },
+			{ text: '"Quoted" text', line: 4, type: "hardcoded" }
+		]);
+	});
+
 	it("skips elements outside the accepted tags, as for JSX", async () => {
 		expect(await lint(`<input placeholder="Your name" />`)).toEqual([]);
 	});

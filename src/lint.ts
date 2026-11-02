@@ -5,6 +5,52 @@ import { parse, type AST } from "svelte/compiler";
 /** Tags whose content is never linted; mirrors i18next-cli's JSX linter defaults. */
 const DEFAULT_IGNORED_TAGS = ["script", "style", "code"];
 
+/**
+ * Attributes never linted unless listed in `acceptedAttributes`; mirrors
+ * i18next-cli's `ignoredAttributes` (not exported from its public API).
+ */
+const DEFAULT_IGNORED_ATTRIBUTES = [
+	"classname",
+	"class",
+	"style",
+	"key",
+	"id",
+	"htmlfor",
+	"for",
+	"name",
+	"href",
+	"src",
+	"srcset",
+	"action",
+	"type",
+	"target",
+	"rel",
+	"role",
+	"method",
+	"enctype",
+	"autocomplete",
+	"autofocus",
+	"tabindex",
+	"data-testid",
+	"data-cy",
+	"i18nkey",
+	"defaults",
+	"ns",
+	"defaultvalue",
+	"onchange",
+	"onclick",
+	"onsubmit",
+	"onfocus",
+	"onblur",
+	"onkeydown",
+	"onkeyup",
+	"onmouseenter",
+	"onmouseleave",
+	"ref",
+	"dangerouslysetinnerhtml",
+	"suppresshydrationwarning"
+];
+
 /** Same directive i18next-cli honours in JS/TS: suppresses issues on the next line. */
 const IGNORE_DIRECTIVE = /i18next-instrument-ignore(?:-next-line)?/;
 
@@ -34,6 +80,7 @@ interface ElementLike {
 interface LintOptions {
 	ignoredTags: Set<string>;
 	acceptedTags: Set<string> | null;
+	acceptAllTags: boolean;
 	acceptedAttributes: Set<string> | null;
 	ignoredAttributes: Set<string>;
 }
@@ -54,12 +101,10 @@ export function resolveLintOptions(config: I18nextToolkitConfig): LintOptions {
 		...(lower(lint?.ignoredTags ?? extract.ignoredTags) ?? [])
 	]);
 
-	const tags: unknown = lint?.acceptedTags ?? extract.acceptedTags ?? recommendedAcceptedTags;
-	const acceptedTags = Array.isArray(tags)
-		? tags.length > 0
-			? new Set(tags.map((s: string) => s.toLowerCase()))
-			: null
-		: null;
+	const tags = lint?.acceptedTags ?? extract.acceptedTags ?? recommendedAcceptedTags;
+	const acceptAllTags = tags === "all";
+	const acceptedTags =
+		Array.isArray(tags) && tags.length > 0 ? new Set(tags.map((s) => s.toLowerCase())) : null;
 
 	const attrs =
 		lower(lint?.acceptedAttributes ?? extract.acceptedAttributes) ??
@@ -68,8 +113,12 @@ export function resolveLintOptions(config: I18nextToolkitConfig): LintOptions {
 	return {
 		ignoredTags,
 		acceptedTags,
+		acceptAllTags,
 		acceptedAttributes: attrs && attrs.length > 0 ? new Set(attrs) : null,
-		ignoredAttributes: new Set(lower(lint?.ignoredAttributes ?? extract.ignoredAttributes))
+		ignoredAttributes: new Set([
+			...DEFAULT_IGNORED_ATTRIBUTES,
+			...(lower(lint?.ignoredAttributes ?? extract.ignoredAttributes) ?? [])
+		])
 	};
 }
 
@@ -100,10 +149,13 @@ export function findHardcodedStrings(
 		return lo + 1;
 	};
 
-	const report = (raw: string, offset: number) => {
-		const text = raw.trim();
+	// `data` is decoded text; `raw` is its source, used to locate it when they differ.
+	const report = (data: string, offset: number, raw?: string) => {
+		const text = data.trim();
 		if (!isTranslatable(text)) return;
-		issues.push({ text, line: lineOf(offset + raw.indexOf(text)), type: "hardcoded" });
+		const lead = data.indexOf(text);
+		const start = offset + (raw === undefined ? lead : rawOffset(raw, lead));
+		issues.push({ text, line: lineOf(start), type: "hardcoded" });
 	};
 
 	// Text is linted when no ancestor element is ignored and, if acceptedTags
@@ -111,7 +163,9 @@ export function findHardcodedStrings(
 	const textAllowed = (tag: string | null) =>
 		options.acceptedTags === null || (tag !== null && options.acceptedTags.has(tag));
 	// Attribute-only mode: acceptedAttributes set explicitly without acceptedTags.
-	const lintText = !(options.acceptedAttributes && !options.acceptedTags);
+	// acceptedTags: "all" is not attribute-only, it lints text in every tag.
+	const lintText =
+		options.acceptAllTags || !(options.acceptedAttributes && !options.acceptedTags);
 
 	const visitAttributes = (element: ElementLike, tag: string) => {
 		if (!textAllowed(tag)) return;
@@ -125,7 +179,7 @@ export function findHardcodedStrings(
 			if (!linted || value === true) continue;
 
 			for (const part of Array.isArray(value) ? value : [value]) {
-				if (part.type === "Text") report(part.data, part.start);
+				if (part.type === "Text") report(part.data, part.start, part.raw);
 				else if (isStringLiteral(part.expression)) {
 					report(part.expression.value, part.expression.start);
 				}
@@ -141,7 +195,8 @@ export function findHardcodedStrings(
 		if (n.type === "Fragment") return visit(n.nodes, tag);
 
 		if (n.type === "Text") {
-			if (lintText && textAllowed(tag)) report((n as AST.Text).data, (n as AST.Text).start);
+			const text = n as AST.Text;
+			if (lintText && textAllowed(tag)) report(text.data, text.start, text.raw);
 			return;
 		}
 
@@ -180,6 +235,20 @@ function isTranslatable(text: string): boolean {
 		isNaN(Number(text)) &&
 		!text.startsWith("{{")
 	);
+}
+
+/**
+ * Maps an offset in decoded text to the matching offset in its raw source,
+ * counting each HTML entity (`&amp;`, `&#160;`) as one decoded character.
+ */
+function rawOffset(raw: string, decodedOffset: number): number {
+	const entity = /&(?:#x?[\da-f]+|[a-z][\da-z]*);/iy;
+	let offset = 0;
+	for (let i = 0; i < decodedOffset && offset < raw.length; i++) {
+		entity.lastIndex = offset;
+		offset += entity.exec(raw)?.[0].length ?? 1;
+	}
+	return offset;
 }
 
 function isElementLike(node: object): node is ElementLike {
