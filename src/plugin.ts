@@ -1,6 +1,6 @@
 import type { CallExpression, Expression, VariableDeclarator } from "@swc/types";
 import type * as estree from "estree";
-import type { Plugin, PluginContext } from "i18next-cli";
+import type { LintIssue, LintPluginContext, Plugin, PluginContext } from "i18next-cli";
 import * as recast from "recast";
 import { parse, type AST } from "svelte/compiler";
 
@@ -10,6 +10,7 @@ import {
 	stripTypeCasts,
 	toIIFE
 } from "./ast.js";
+import { findHardcodedStrings, resolveLintOptions } from "./lint.js";
 
 /**
  * The node type passed to {@link Plugin.onVisitNode}. i18next-cli walks an
@@ -31,6 +32,39 @@ type LegacyRoot = AST.Root & { html: AST.Fragment & { children: unknown[] } };
 export class I18nextPluginSvelte implements Plugin {
 	/** i18next-cli plugin name. */
 	public readonly name = "i18next-cli-plugin-svelte";
+
+	/** Limits lint hooks to Svelte components. */
+	public readonly lintExtensions = [".svelte"];
+
+	private lintOptions: ReturnType<typeof resolveLintOptions> | undefined;
+	private readonly lintSources = new Map<string, string>();
+
+	/** Resolves accepted/ignored tags and attributes from the lint config once per run. */
+	lintSetup(context: LintPluginContext): void {
+		this.lintOptions = resolveLintOptions(context.config);
+	}
+
+	/**
+	 * i18next-cli parses lint input as JS/TS, which a component is not. Keep the
+	 * source for {@link lintOnResult} and hand the linter an empty module.
+	 */
+	lintOnLoad(code: string, path: string): string | undefined {
+		if (!path.match(/\.svelte$/)) return undefined;
+		this.lintSources.set(path, code);
+		return "";
+	}
+
+	/**
+	 * Reports hardcoded strings found in the component markup.
+	 *
+	 * @see https://github.com/i18next/i18next-cli/pull/192
+	 */
+	lintOnResult(path: string, issues: LintIssue[]): LintIssue[] | undefined {
+		const code = this.lintSources.get(path);
+		if (code === undefined || !this.lintOptions) return undefined;
+		this.lintSources.delete(path);
+		return [...issues, ...findHardcodedStrings(code, path, this.lintOptions)];
+	}
 
 	/**
 	 * Extracts JS code from Svelte component `<script>` or `<script module>`,
